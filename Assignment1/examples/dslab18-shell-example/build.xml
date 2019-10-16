@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project name="dslab18-shell-example" default="compile" basedir=".">
+
+	<property name="src.dir" value="src/main/java" />
+	<property name="src.resources.dir" value="src/main/resources" />
+	<property name="build.dir" value="build" />
+	<property name="lib.dir" value="lib" />
+	<property name="zip.name" value="dslab18-shell-example.zip" />
+
+	<path id="project.classpath">
+		<pathelement location="${build.dir}" />
+		<fileset dir="${lib.dir}">
+			<include name="*.jar" />
+		</fileset>
+	</path>
+
+	<!-- create the zip file: -->
+	<target name="zip" depends="clean">
+		<delete file="${zip.name}" />
+		<zip destfile="${zip.name}">
+			<fileset dir="${basedir}">
+				<exclude name="target/**" />
+				<exclude name=".idea/**"/>
+				<exclude name="build/**"/>
+				<exclude name="*.iml"/>
+			</fileset>
+		</zip>
+	</target>
+
+	<target name="compile" description="Compile project.">
+		<mkdir dir="${build.dir}" />
+		<javac srcdir="${src.dir}" destdir="${build.dir}" classpathref="project.classpath" debug="true" deprecation="true" includeantruntime="false" />
+		<copy todir="${build.dir}">
+			<fileset dir="${src.resources.dir}">
+				<include name="*.properties" />
+			</fileset>
+		</copy>
+	</target>
+
+	<target name="run" depends="compile" description="Run Sample.">
+		<java classname="example.Main" fork="true" classpathref="project.classpath" />
+	</target>
+
+	<target name="clean" description="Clean build products.">
+		<delete dir="${build.dir}" />
+		<delete file="${zip.name}" />
+	</target>
+
+	<target name="rebuild" depends="clean, compile" description="Clean and build products." />
+</project>

@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project name="dslab19" default="compile" basedir=".">
+
+  <property name="src.dir" value="src/main/java"/>
+  <property name="src.resources.dir" value="src/main/resources"/>
+  <property name="test.src.dir" value="src/test/java"/>
+  <property name="test.resources.dir" value="src/test/resources"/>
+
+  <property name="build.dir" value="build"/>
+  <property name="reports.dir" value="reports"/>
+  <property name="lib.dir" value="lib"/>
+
+  <path id="project.classpath">
+    <pathelement location="${build.dir}"/>
+    <pathelement location="${lib.dir}/commons-logging-1.2.jar"/>
+    <pathelement location="${lib.dir}/hamcrest-core-1.3.jar"/>
+    <pathelement location="${lib.dir}/junit-4.12.jar"/>
+    <pathelement location="${lib.dir}/orvell-core-0.2.0.jar"/>
+  </path>
+
+  <target name="compile" description="Compile project.">
+    <mkdir dir="${build.dir}"/>
+    <javac destdir="${build.dir}" classpathref="project.classpath" debug="true" deprecation="true"
+           includeantruntime="false">
+      <src path="${src.dir};${test.src.dir}"/>
+    </javac>
+    <copy todir="${build.dir}">
+      <fileset dir="${src.resources.dir}">
+        <include name="*.properties"/>
+      </fileset>
+      <fileset dir="${test.resources.dir}">
+        <include name="*.txt"/>
+      </fileset>
+    </copy>
+  </target>
+
+  <target name="clean" description="Clean build products.">
+    <delete dir="${build.dir}"/>
+    <delete dir="${reports.dir}"/>
+  </target>
+
+  <target name="rebuild" depends="clean, compile" description="Clean and build products."/>
+
+  <target name="test" description="Test the solution" depends="compile">
+    <mkdir dir="${reports.dir}"/>
+    <junit includeantruntime="true" logfailedtests="true" showoutput="true" printsummary="true">
+      <classpath refid="project.classpath"/>
+      <formatter type="plain"/>
+      <batchtest fork="false" todir="${reports.dir}">
+        <fileset dir="${test.src.dir}">
+          <include name="**/*Test.java"/>
+        </fileset>
+      </batchtest>
+    </junit>
+  </target>
+
+  <target name="run-monitoring" depends="compile" description="Run Monitoring Server">
+    <java classname="dslab.monitoring.MonitoringServer" fork="false" classpathref="project.classpath">
+      <arg value="monitoring"/>
+    </java>
+  </target>
+
+  <target name="run-transfer-1" depends="compile" description="Run Transfer Server #1">
+    <java classname="dslab.transfer.TransferServer" fork="false" classpathref="project.classpath">
+      <arg value="transfer-1"/>
+    </java>
+  </target>
+
+  <target name="run-transfer-2" depends="compile" description="Run Transfer Server #2">
+    <java classname="dslab.transfer.TransferServer" fork="false" classpathref="project.classpath">
+      <arg value="transfer-2"/>
+    </java>
+  </target>
+
+  <target name="run-mailbox-earth-planet" depends="compile" description="Run Mailbox Server for earth.planet">
+    <java classname="dslab.mailbox.MailboxServer" fork="false" classpathref="project.classpath">
+      <arg value="mailbox-earth-planet"/>
+    </java>
+  </target>
+
+  <target name="run-mailbox-univer-ze" depends="compile" description="Run Mailbox Server for univer.ze">
+    <java classname="dslab.mailbox.MailboxServer" fork="false" classpathref="project.classpath">
+      <arg value="mailbox-univer-ze"/>
+    </java>
+  </target>
+
+  <!-- Required for Assignment 2 -->
+
+  <target name="run-ns-root" depends="compile" description="Run root nameserver">
+    <java classname="dslab.nameserver.Nameserver" fork="false" classpathref="project.classpath">
+      <arg value="ns-root"/>
+    </java>
+  </target>
+
+  <target name="run-ns-ze" depends="compile" description="Run root nameserver">
+    <java classname="dslab.nameserver.Nameserver" fork="false" classpathref="project.classpath">
+      <arg value="ns-ze"/>
+    </java>
+  </target>
+
+  <target name="run-ns-planet" depends="compile" description="Run root nameserver">
+    <java classname="dslab.nameserver.Nameserver" fork="false" classpathref="project.classpath">
+      <arg value="ns-planet"/>
+    </java>
+  </target>
+
+  <target name="run-ns-earth-planet" depends="compile" description="Run root nameserver">
+    <java classname="dslab.nameserver.Nameserver" fork="false" classpathref="project.classpath">
+      <arg value="ns-earth-planet"/>
+    </java>
+  </target>
+
+  <target name="run-client-trillian" depends="compile" description="Run root nameserver">
+    <java classname="dslab.client.MessageClient" fork="false" classpathref="project.classpath">
+      <arg value="client-trillian"/>
+    </java>
+  </target>
+
+  <target name="run-client-arthur" depends="compile" description="Run root nameserver">
+    <java classname="dslab.client.MessageClient" fork="false" classpathref="project.classpath">
+      <arg value="client-arthur"/>
+    </java>
+  </target>
+
+  <target name="run-client-zaphod" depends="compile" description="Run root nameserver">
+    <java classname="dslab.client.MessageClient" fork="false" classpathref="project.classpath">
+      <arg value="client-zaphod"/>
+    </java>
+  </target>
+
+</project>
