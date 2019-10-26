@@ -1,7 +1,9 @@
 package dslab.transfer;
 
-import java.io.InputStream;
-import java.io.PrintStream;
+import java.io.*;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.Scanner;
 
 import dslab.ComponentFactory;
 import dslab.util.Config;
@@ -23,6 +25,73 @@ public class TransferServer implements ITransferServer, Runnable {
     @Override
     public void run() {
         // TODO
+        try {
+
+            ServerSocket serverSocket = new ServerSocket(9991);
+            Socket socketClient = serverSocket.accept(); //accept incoming request / get the socket from incoming device
+
+            System.out.println("client connected");
+
+            //Receiver message from incoming device
+            InputStreamReader isr = new InputStreamReader(socketClient.getInputStream());
+            BufferedReader bfr = new BufferedReader(isr);
+            // while (response = bfr.readLine() != null) {...}
+
+            //Send message to incoming device
+            PrintWriter pr = new PrintWriter(socketClient.getOutputStream());
+            //pr.print(message);
+            //pr.flush() //clear stream, used when communication is finished
+
+
+            pr.println("Server: Welcome! Type 'disconnect' to exit.");
+            pr.flush();
+
+            boolean done = false;
+            String response;
+            while (!done && (response = bfr.readLine()) != null) {
+                System.out.println("Client: " + response);
+                pr.println("Server: " + response);
+
+                if(response.toLowerCase().trim().equals("disconnect")){
+                    done = true;
+                    pr.println("WOW! Go to hell! Bye!");
+                }
+
+                pr.flush();
+            }
+
+            /*
+            Socket connectionSocket = serverSocket.accept();
+
+            //Create Input&Outputstreams for the connection
+            InputStream inputToServer = connectionSocket.getInputStream();
+            OutputStream outputFromServer = connectionSocket.getOutputStream();
+
+            Scanner scanner = new Scanner(inputToServer, "UTF-8");
+            PrintWriter serverPrintOut = new PrintWriter(new OutputStreamWriter(outputFromServer, "UTF-8"), true);
+
+            serverPrintOut.println("Server: Welcome! Type 'disconnect' to exit.");
+
+            //Have the server take input from the client and echo it back
+            //This should be placed in a loop that listens for a terminator text e.g. bye
+            boolean done = false;
+
+            while(!done && scanner.hasNextLine()) {
+                String line = scanner.nextLine();
+                serverPrintOut.println("Server: " + line);
+                serverPrintOut.flush();
+
+                if(line.toLowerCase().trim().equals("disconnect")){
+                    done = true;
+                    serverPrintOut.println("Server: WOW! Go to hell! Bye!");
+                    serverPrintOut.flush();
+                }
+
+            }
+            */
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
