@@ -1,12 +1,19 @@
 package dslab.mailbox;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.net.ServerSocket;
 
 import dslab.ComponentFactory;
 import dslab.util.Config;
 
 public class MailboxServer implements IMailboxServer, Runnable {
+
+    private String compontentId;
+    private Config config;
+    private ServerSocket serverSocketDMTP;
+    private ServerSocket serverSocketDMAP;
 
     /**
      * Creates a new server instance.
@@ -18,6 +25,27 @@ public class MailboxServer implements IMailboxServer, Runnable {
      */
     public MailboxServer(String componentId, Config config, InputStream in, PrintStream out) {
         // TODO
+        this.compontentId = componentId;
+        this.config = config;
+        try {
+            this.serverSocketDMTP = new ServerSocket(config.getInt("dmtp.tcp.port"));
+            this.serverSocketDMAP = new ServerSocket(config.getInt("dmap.tcp.port"));
+            printBootUpMessage();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void printBootUpMessage(){
+        System.out.println("Mailbox Server '" + compontentId + "' online. \n" +
+                "\tDMTP on port " + config.getInt("dmtp.tcp.port") + "\n" +
+                "\tDMAP on port " + config.getInt("dmap.tcp.port") + "\n"
+        );
+        System.out.println(
+                "Use command 'nc " +
+                        config.getString("registry.host") + " <port number>" +
+                        "' in terminal app to connect"
+        );
     }
 
     @Override

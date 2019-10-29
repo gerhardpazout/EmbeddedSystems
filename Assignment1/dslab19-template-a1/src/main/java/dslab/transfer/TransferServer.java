@@ -5,13 +5,16 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Scanner;
 
+import at.ac.tuwien.dsg.orvell.Shell;
 import dslab.ComponentFactory;
 import dslab.util.Config;
 
 public class TransferServer implements ITransferServer, Runnable {
 
-    private ServerSocket serverSocket;
+    private String componentId;
     private Config config;
+    private ServerSocket serverSocket;
+    private Shell shell;
 
     /**
      * Creates a new server instance.
@@ -23,7 +26,9 @@ public class TransferServer implements ITransferServer, Runnable {
      */
     public TransferServer(String componentId, Config config, InputStream in, PrintStream out) {
         // TODO
+        this.componentId = componentId;
         this.config = config;
+        this.shell = new Shell(in, out);
 
         try {
             serverSocket = new ServerSocket(config.getInt("tcp.port"));
@@ -38,6 +43,8 @@ public class TransferServer implements ITransferServer, Runnable {
         // TODO
         try {
             Socket socketClient = serverSocket.accept(); //accept incoming request / get the socket from incoming device
+
+            //shell.run();
 
             System.out.println("client connected");
 
@@ -104,8 +111,13 @@ public class TransferServer implements ITransferServer, Runnable {
     }
 
     private void printBootUpMessage(){
-        System.out.println("Transfer Server online on port: " + config.getInt("tcp.port"));
-        System.out.println("Use command 'nc " + config.getString("registry.host") + " " + config.getInt("tcp.port") + "' in terminal app to connect");
+        System.out.println("Transfer Server '" + componentId + "' online on port: " + config.getInt("tcp.port"));
+        System.out.println(
+                "Use command 'nc " +
+                config.getString("registry.host") + " " +
+                config.getInt("tcp.port") +
+                "' in terminal app to connect"
+        );
     }
 
     @Override
