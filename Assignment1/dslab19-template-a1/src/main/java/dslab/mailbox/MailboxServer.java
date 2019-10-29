@@ -10,7 +10,7 @@ import dslab.util.Config;
 
 public class MailboxServer implements IMailboxServer, Runnable {
 
-    private String compontentId;
+    private String componentId;
     private Config config;
     private ServerSocket serverSocketDMTP;
     private ServerSocket serverSocketDMAP;
@@ -25,7 +25,7 @@ public class MailboxServer implements IMailboxServer, Runnable {
      */
     public MailboxServer(String componentId, Config config, InputStream in, PrintStream out) {
         // TODO
-        this.compontentId = componentId;
+        this.componentId = componentId;
         this.config = config;
         try {
             this.serverSocketDMTP = new ServerSocket(config.getInt("dmtp.tcp.port"));
@@ -37,7 +37,7 @@ public class MailboxServer implements IMailboxServer, Runnable {
     }
 
     private void printBootUpMessage(){
-        System.out.println("Mailbox Server '" + compontentId + "' online. \n" +
+        System.out.println("Mailbox Server '" + componentId + "' online. \n" +
                 "\tDMTP on port " + config.getInt("dmtp.tcp.port") + "\n" +
                 "\tDMAP on port " + config.getInt("dmap.tcp.port") + "\n"
         );
