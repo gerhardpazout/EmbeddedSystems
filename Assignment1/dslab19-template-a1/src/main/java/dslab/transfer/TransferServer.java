@@ -10,6 +10,9 @@ import dslab.util.Config;
 
 public class TransferServer implements ITransferServer, Runnable {
 
+    private ServerSocket serverSocket;
+    private Config config;
+
     /**
      * Creates a new server instance.
      *
@@ -20,14 +23,20 @@ public class TransferServer implements ITransferServer, Runnable {
      */
     public TransferServer(String componentId, Config config, InputStream in, PrintStream out) {
         // TODO
+        this.config = config;
+
+        try {
+            serverSocket = new ServerSocket(config.getInt("tcp.port"));
+            printBootUpMessage();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
     public void run() {
         // TODO
         try {
-
-            ServerSocket serverSocket = new ServerSocket(9991);
             Socket socketClient = serverSocket.accept(); //accept incoming request / get the socket from incoming device
 
             System.out.println("client connected");
@@ -92,6 +101,11 @@ public class TransferServer implements ITransferServer, Runnable {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private void printBootUpMessage(){
+        System.out.println("Transfer Server online on port: " + config.getInt("tcp.port"));
+        System.out.println("Use command 'nc " + config.getString("registry.host") + " " + config.getInt("tcp.port") + "' in terminal app to connect");
     }
 
     @Override
