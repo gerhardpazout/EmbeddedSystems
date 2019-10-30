@@ -3,9 +3,7 @@ package dslab.transfer;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.Scanner;
 
-import at.ac.tuwien.dsg.orvell.Shell;
 import dslab.ComponentFactory;
 import dslab.util.Config;
 
@@ -14,7 +12,8 @@ public class TransferServer implements ITransferServer, Runnable {
     private String componentId;
     private Config config;
     private ServerSocket serverSocket;
-    private Shell shell;
+    private InputStream in;
+    private PrintStream out;
 
     /**
      * Creates a new server instance.
@@ -28,7 +27,10 @@ public class TransferServer implements ITransferServer, Runnable {
         // TODO
         this.componentId = componentId;
         this.config = config;
-        this.shell = new Shell(in, out);
+        this.in = this.in;
+        this.out = out;
+
+        //cli = new CommandLine("cli-transfer-1", config, in, out);
 
         try {
             serverSocket = new ServerSocket(config.getInt("tcp.port"));
@@ -41,72 +43,24 @@ public class TransferServer implements ITransferServer, Runnable {
     @Override
     public void run() {
         // TODO
-        try {
-            Socket socketClient = serverSocket.accept(); //accept incoming request / get the socket from incoming device
 
-            //shell.run();
+        //run infinite loop to get all client requests (e.g. multiple client connections)
+        while(true){
+            try {
+                Socket socketClient = serverSocket.accept(); //accept incoming request / get the socket from incoming device
 
-            System.out.println("client connected");
+                // create a new thread object to allow multiple clients
+                Thread client = new ClientHandler(socketClient, socketClient.getInputStream(), socketClient.getOutputStream());
+                //clientThreads.add(client);
+                // Invoking the start() method
+                client.start();
 
-            //Receiver message from incoming device
-            InputStreamReader isr = new InputStreamReader(socketClient.getInputStream());
-            BufferedReader bfr = new BufferedReader(isr);
-            // while (response = bfr.readLine() != null) {...}
+                // additional code...
 
-            //Send message to incoming device
-            PrintWriter pr = new PrintWriter(socketClient.getOutputStream());
-            //pr.print(message);
-            //pr.flush() //clear stream, used when communication is finished
-
-
-            pr.println("Server: Welcome! Type 'disconnect' to exit.");
-            pr.flush();
-
-            boolean done = false;
-            String response;
-            while (!done && (response = bfr.readLine()) != null) {
-                System.out.println("Client: " + response);
-                pr.println("Server: " + response);
-
-                if(response.toLowerCase().trim().equals("disconnect")){
-                    done = true;
-                    pr.println("WOW! Go to hell! Bye!");
-                }
-
-                pr.flush();
-            }
-
-            /*
-            Socket connectionSocket = serverSocket.accept();
-
-            //Create Input&Outputstreams for the connection
-            InputStream inputToServer = connectionSocket.getInputStream();
-            OutputStream outputFromServer = connectionSocket.getOutputStream();
-
-            Scanner scanner = new Scanner(inputToServer, "UTF-8");
-            PrintWriter serverPrintOut = new PrintWriter(new OutputStreamWriter(outputFromServer, "UTF-8"), true);
-
-            serverPrintOut.println("Server: Welcome! Type 'disconnect' to exit.");
-
-            //Have the server take input from the client and echo it back
-            //This should be placed in a loop that listens for a terminator text e.g. bye
-            boolean done = false;
-
-            while(!done && scanner.hasNextLine()) {
-                String line = scanner.nextLine();
-                serverPrintOut.println("Server: " + line);
-                serverPrintOut.flush();
-
-                if(line.toLowerCase().trim().equals("disconnect")){
-                    done = true;
-                    serverPrintOut.println("Server: WOW! Go to hell! Bye!");
-                    serverPrintOut.flush();
-                }
+            } catch (IOException e) {
+                e.printStackTrace();
 
             }
-            */
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 
@@ -114,20 +68,88 @@ public class TransferServer implements ITransferServer, Runnable {
         System.out.println("Transfer Server '" + componentId + "' online on port: " + config.getInt("tcp.port"));
         System.out.println(
                 "Use command 'nc " +
-                config.getString("registry.host") + " " +
-                config.getInt("tcp.port") +
-                "' in terminal app to connect"
+                        config.getString("registry.host") + " " +
+                        config.getInt("tcp.port") +
+                        "' in terminal app to connect"
         );
     }
 
     @Override
     public void shutdown() {
         // TODO
+        try {
+            System.out.println("shutting down connection");
+            serverSocket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public static void main(String[] args) throws Exception {
         ITransferServer server = ComponentFactory.createTransferServer(args[0], System.in, System.out);
-        server.run();
+        //server.run();
+        new Thread(server).start();
     }
 
+}
+
+// ClientHandler class
+class ClientHandler extends Thread{
+    private InputStream in;
+    private OutputStream out;
+    private Socket socket;
+
+    // Constructor
+    public ClientHandler(Socket socket, InputStream in, OutputStream out)
+    {
+        this.socket = socket;
+        this.in = in;
+        this.out = out;
+    }
+
+    @Override
+    public void run()
+    {
+        try {
+            System.out.println("client connected");
+
+            //Receiver message from incoming device
+            InputStreamReader isr = new InputStreamReader(socket.getInputStream());
+            BufferedReader bfr = new BufferedReader(isr);
+
+            //Send message to incoming device
+            PrintWriter pr = new PrintWriter(socket.getOutputStream());
+
+            pr.println("Server: Welcome! Type 'quit' to exit.");
+            pr.flush();
+
+            boolean done = false;
+            String response;
+            while (!done && (response = bfr.readLine()) != null) {
+
+                if(response.toLowerCase().trim().equals("quit")){
+                    done = true;
+                    pr.println("Server: WOW! I don't need you anyways! Go to hell! Bye!");
+
+                    // close input & output streams
+                    pr.flush();
+                    isr.close();
+                    bfr.close();
+                    pr.close();
+
+                    // close socket connection
+                    socket.close();
+
+                    // kill thread
+                    this.interrupt();
+                }
+                else{
+                    pr.println("Server: " + response);
+                }
+                pr.flush();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 }
