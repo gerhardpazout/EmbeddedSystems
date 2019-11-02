@@ -75,18 +75,37 @@ public class MailboxServer implements IMailboxServer, Runnable {
             InputStreamReader isr = new InputStreamReader(transferSocket.getInputStream());
             BufferedReader bfr = new BufferedReader(isr);
 
-            String message = bfr.readLine();
-            System.out.println("transfer server: " + message);
+
+            //String message = bfr.readLine();
+            //System.out.println("transfer server: " + message);
 
             //Send message to incoming device
             PrintWriter pr = new PrintWriter(transferSocket.getOutputStream());
 
-            pr.println("Mailbox Server: Welcome! Type 'disconnect' to exit.");
+            pr.println("You are now connected to the mailbox server!");
             pr.flush();
+
+
+            boolean done = false;
+            String response;
+            while (!done && (response = bfr.readLine()) != null) {
+
+                //print message that transfer server sent
+                System.out.println("Transfer Server: " + response);
+
+                //send message from mailbox server to transfer server
+                pr.println(response);
+                pr.flush();
+            }
 
         } catch (IOException e) {
             e.printStackTrace();
         }
+        /*
+        Thread transferThread = new TransferSocketHandler(config.getInt("dmtp.tcp.port"));
+        transferThread.start();
+        printBootUpMessage();
+        */
     }
 
     @Override
@@ -97,5 +116,92 @@ public class MailboxServer implements IMailboxServer, Runnable {
     public static void main(String[] args) throws Exception {
         IMailboxServer server = ComponentFactory.createMailboxServer(args[0], System.in, System.out);
         server.run();
+    }
+}
+
+class TransferSocketHandler extends Thread {
+    private ServerSocket serverSocket;
+
+    public TransferSocketHandler(int port){
+        try {
+            this.serverSocket = new ServerSocket(port);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void run(){
+        while(true){
+            try {
+                //accept incoming request / get the socket from incoming device
+                Socket socketClient = serverSocket.accept();
+                System.out.println("Transfer Server connected");
+
+                // create a new thread object to allow multiple clients
+                Thread transfer = new TransferHandler(socketClient, socketClient.getInputStream(), socketClient.getOutputStream());
+
+                // Invoking the start() method
+                transfer.start();
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+class TransferHandler extends Thread {
+
+    private Socket socket;
+    private InputStream in;
+    private OutputStream out;
+
+    public TransferHandler(Socket socket, InputStream in, OutputStream out){
+        this.socket = socket;
+        this.in = in;
+        this.out = out;
+    }
+
+    @Override
+    public void run() {
+        try {
+            //Receiver message from incoming device
+            InputStreamReader isr = new InputStreamReader(socket.getInputStream());
+            BufferedReader bfr = new BufferedReader(isr);
+
+            //Send message to incoming device
+            PrintWriter pr = new PrintWriter(socket.getOutputStream());
+
+            pr.println("You are connected to the mailbox server");
+            pr.flush();
+
+            boolean done = false;
+            String response;
+            while (!done && (response = bfr.readLine()) != null) {
+
+                if(response.toLowerCase().trim().equals("quit")){
+                    done = true;
+                    pr.println("WOW! I don't need you anyways! Go to hell! Bye!");
+
+                    // close input & output streams
+                    pr.flush();
+                    isr.close();
+                    bfr.close();
+                    pr.close();
+
+                    // close socket connection
+                    socket.close();
+
+                    // kill thread
+                    this.interrupt();
+                }
+                else{
+                    pr.println(response);
+                }
+                pr.flush();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }
