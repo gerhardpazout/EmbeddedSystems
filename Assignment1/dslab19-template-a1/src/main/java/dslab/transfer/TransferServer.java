@@ -3,12 +3,14 @@ package dslab.transfer;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
 import dslab.ComponentFactory;
 import dslab.util.Config;
+import dslab.util.DMTPMessage;
 
 public class TransferServer implements ITransferServer, Runnable {
 
@@ -195,35 +197,53 @@ class ClientHandler extends Thread{
             pr.flush();
 
             boolean done = false;
-            String response;
-            while (!done && (response = bfr.readLine()) != null) {
+            String messageFromClient;
+            String responseToClient;
+            DMTPMessage dmtp = new DMTPMessage();
 
-                try {
-                    // put client message in data queue => data queue will be forwarded to mailbox server
-                    data.put(response);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
+            while (!done && (messageFromClient = bfr.readLine()) != null) {
+                if(!messageFromClient.isEmpty()){
+
+                    messageFromClient = messageFromClient.toLowerCase();
+                    responseToClient = checkClientInput(messageFromClient, dmtp);
+
+                    String input = messageFromClient;
+                    System.out.println("context: " + getContext(input));
+
+                    try {
+                        // put client message in data queue => data queue will be forwarded to mailbox server
+                        data.put(messageFromClient);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+
+                    if(messageFromClient.toLowerCase().trim().equals("quit")){
+                        done = true;
+                        pr.println("Transfer Server: WOW! I don't need you anyways! Go to hell! Bye!");
+
+                        // close input & output streams
+                        pr.flush();
+                        isr.close();
+                        bfr.close();
+                        pr.close();
+
+                        // close socket connection
+                        socket.close();
+
+                        // kill thread
+                        this.interrupt();
+                    }
+                    else{
+                        pr.println("Transfer Server: " + messageFromClient);
+                        pr.flush();
+
+                    }
+
                 }
-
-                if(response.toLowerCase().trim().equals("quit")){
-                    done = true;
-                    pr.println("Transfer Server: WOW! I don't need you anyways! Go to hell! Bye!");
-
-                    // close input & output streams
-                    pr.flush();
-                    isr.close();
-                    bfr.close();
-                    pr.close();
-
-                    // close socket connection
-                    socket.close();
-
-                    // kill thread
-                    this.interrupt();
+                else {
+                    responseToClient = "error empty input";
                 }
-                else{
-                    pr.println("Transfer Server: " + response);
-                }
+                pr.println("Transfer Server - Command Response: " + responseToClient);
                 pr.flush();
             }
         } catch (IOException e) {
@@ -231,4 +251,104 @@ class ClientHandler extends Thread{
         }
 
     }
+
+    public String checkClientInput(String input, DMTPMessage dmtp){
+        String response = "";
+        String command = getCommand(input);
+
+        if(isNullOrEmpty(input)) return "error no command";
+
+        System.out.println("before getContext()");
+
+        String context = getContext(input);
+
+        /*
+        System.out.println("after getContext() - result: ");
+        if(isNullOrEmpty(context)){
+            return "context is empty!";
+        }
+        else{
+            System.out.println("context: " + context);
+        }
+        */
+
+        switch (command){
+            case "begin":
+                //
+                response = "ok";
+                break;
+            case "from":
+                if(!isNullOrEmpty(context)){
+                    dmtp.setSender(context);
+                    response = "ok";
+                }
+                else {
+                    response = "error no sender";
+                }
+                break;
+            case "to":
+                //get recipients;
+                //TODO: error unknown recipient ford
+                if(!isNullOrEmpty(context)){
+                    dmtp.setRecipients(getRecipients(context));
+                    response = "ok " + getRecipients(context).length;
+                }
+                else{
+                    response = "error no recipient";
+                }
+
+                break;
+            case "subject":
+                dmtp.setData(context);
+                response = "ok";
+                break;
+            case "data":
+                dmtp.setData(context);
+                response = "ok";
+                break;
+            case "send":
+                //
+                if(dmtp.getRecipients() == null || dmtp.getRecipients().size() == 0){
+                    response = "error no recipient";
+                }
+                else if(dmtp.getSender() == null){
+                    response = "error no sender";
+                }
+                else {
+                    response = "ok";
+                }
+                break;
+            default:
+                response = "error protocol error";
+                break;
+        }
+
+        return response;
+    }
+
+    public String getCommand(String input){
+        return (input.split(" ").length >= 1)? input.split(" ")[0] : input;
+    }
+
+    public String getContext(String input){
+        //return ((input.split(" ").length >= 2))? input.substring(input.indexOf(" ")).trim() : null;
+
+        System.out.println("context - split: " + (input.split(" ").length));
+        if(input.split(" ").length < 2){
+            return null;
+        }
+        return input.substring(input.indexOf(" ")).trim();
+    }
+
+    public String[] getRecipients(String context){
+        String regex = "\\s*,[,\\s]*";
+        return context.split(regex);
+    }
+
+    public static boolean isNullOrEmpty(String str) {
+        if(str != null && !str.isEmpty())
+            return false;
+        return true;
+    }
+
 }
