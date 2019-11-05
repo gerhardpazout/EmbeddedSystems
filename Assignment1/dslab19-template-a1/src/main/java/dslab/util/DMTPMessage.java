@@ -11,9 +11,9 @@ public class DMTPMessage {
     private ArrayList<String> recipients = new ArrayList<>();
 
     public DMTPMessage() {
-        subject = null;
-        data = null;
-        sender = null;
+        subject = "";
+        data = "";
+        sender = "";
         recipients = null;
     }
 

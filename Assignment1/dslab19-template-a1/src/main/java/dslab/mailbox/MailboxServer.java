@@ -179,6 +179,8 @@ class TransferHandler extends Thread {
             String response;
             while (!done && (response = bfr.readLine()) != null) {
 
+                System.out.println("response: " + response);
+
                 if(response.toLowerCase().trim().equals("quit")){
                     done = true;
                     pr.println("WOW! I don't need you anyways! Go to hell! Bye!");

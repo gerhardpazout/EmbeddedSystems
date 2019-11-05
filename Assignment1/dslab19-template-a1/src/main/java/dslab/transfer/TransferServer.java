@@ -5,6 +5,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
@@ -18,7 +19,7 @@ public class TransferServer implements ITransferServer, Runnable {
     private Config config;
     private InputStream in;
     private PrintStream out;
-    private BlockingQueue data = new ArrayBlockingQueue(20);
+    private BlockingQueue<DMTPMessage> data = new ArrayBlockingQueue<DMTPMessage>(20);
 
     /**
      * Creates a new server instance.
@@ -84,10 +85,10 @@ class MailboxSocketHandler extends Thread {
     private Socket socket;
     private String host;
     private int port;
-    private BlockingQueue data;
+    private BlockingQueue<DMTPMessage> data;
 
     // Constructor
-    public MailboxSocketHandler(String host, int port, BlockingQueue data) {
+    public MailboxSocketHandler(String host, int port, BlockingQueue<DMTPMessage> data) {
         this.host = host;
         this.port = port;
         this.data = data;
@@ -108,6 +109,7 @@ class MailboxSocketHandler extends Thread {
             //pr.println("Whats up mailbox server?");
             //pr.flush();
 
+            /*
             boolean done = false;
             String response;
             while (!done && (response = bfr.readLine()) != null) {
@@ -124,10 +126,47 @@ class MailboxSocketHandler extends Thread {
                     e.printStackTrace();
                 }
             }
+            */
+            while (true){
+                DMTPMessage dmtp;
+                while( !data.isEmpty() ){
+
+                    try {
+                        dmtp = data.take();
+
+                        for (String recipient : dmtp.getRecipients()){
+                            sendDMPT(pr, dmtp, recipient);
+                        }
+
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
 
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public void sendDMPT(PrintWriter pr, DMTPMessage dmtp, String recipient){
+        sendMessage(pr, "begin");
+        sendMessage(pr, "from " + dmtp.getSender());
+        sendMessage(pr, "to " + recipient);
+        sendMessage(pr, "subject " + dmtp.getSubject());
+        sendMessage(pr, "data " + dmtp.getData());
+        System.out.println("DMTP sent!");
+    }
+
+    public void sendMessage(PrintWriter pr, String message){
+        pr.println(message);
+        pr.flush();
     }
 }
 
@@ -135,9 +174,9 @@ class MailboxSocketHandler extends Thread {
 class ClientSocketHandler extends Thread {
 
     ServerSocket serverSocket;
-    BlockingQueue data;
+    BlockingQueue<DMTPMessage> data;
 
-    public ClientSocketHandler(int port, BlockingQueue data){
+    public ClientSocketHandler(int port, BlockingQueue<DMTPMessage> data){
         try {
             serverSocket = new ServerSocket(port);
             this.data = data;
@@ -171,10 +210,10 @@ class ClientHandler extends Thread{
     private OutputStream out;
     private ServerSocket serverSocket;
     private Socket socket;
-    private BlockingQueue data;
+    private BlockingQueue<DMTPMessage> data;
 
     // Constructor
-    public ClientHandler(Socket socket, InputStream in, OutputStream out, BlockingQueue data)
+    public ClientHandler(Socket socket, InputStream in, OutputStream out, BlockingQueue<DMTPMessage> data)
     {
         this.socket = socket;
         this.in = in;
@@ -208,14 +247,6 @@ class ClientHandler extends Thread{
                     responseToClient = checkClientInput(messageFromClient, dmtp);
 
                     String input = messageFromClient;
-                    System.out.println("context: " + getContext(input));
-
-                    try {
-                        // put client message in data queue => data queue will be forwarded to mailbox server
-                        data.put(messageFromClient);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
 
                     if(messageFromClient.toLowerCase().trim().equals("quit")){
                         done = true;
@@ -258,19 +289,8 @@ class ClientHandler extends Thread{
 
         if(isNullOrEmpty(input)) return "error no command";
 
-        System.out.println("before getContext()");
 
         String context = getContext(input);
-
-        /*
-        System.out.println("after getContext() - result: ");
-        if(isNullOrEmpty(context)){
-            return "context is empty!";
-        }
-        else{
-            System.out.println("context: " + context);
-        }
-        */
 
         switch (command){
             case "begin":
@@ -315,7 +335,14 @@ class ClientHandler extends Thread{
                     response = "error no sender";
                 }
                 else {
-                    response = "ok";
+                    //put client dmtp message in data queue => data queue will be forwarded to mailbox server
+                    try {
+                        data.put(dmtp);
+                        response = "ok";
+                        System.out.println("DMTP nachricht in Queue!");
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
                 }
                 break;
             default:
@@ -333,7 +360,6 @@ class ClientHandler extends Thread{
     public String getContext(String input){
         //return ((input.split(" ").length >= 2))? input.substring(input.indexOf(" ")).trim() : null;
 
-        System.out.println("context - split: " + (input.split(" ").length));
         if(input.split(" ").length < 2){
             return null;
         }
