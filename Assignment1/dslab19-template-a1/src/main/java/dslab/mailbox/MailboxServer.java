@@ -3,11 +3,15 @@ package dslab.mailbox;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
 
 import at.ac.tuwien.dsg.orvell.Shell;
 import dslab.ComponentFactory;
+import dslab.monitoring.DMTPDatabaseMessage;
+import dslab.monitoring.DMTPDatabse;
 import dslab.util.CommandLine;
 import dslab.util.Config;
+import dslab.util.DMTPMessage;
 
 public class MailboxServer implements IMailboxServer, Runnable {
 
@@ -19,6 +23,7 @@ public class MailboxServer implements IMailboxServer, Runnable {
     private InputStream in;
     private OutputStream out;
     private Socket transferSocket;
+    private DMTPDatabse db;
 
     /**
      * Creates a new server instance.
@@ -34,7 +39,9 @@ public class MailboxServer implements IMailboxServer, Runnable {
         this.config = config;
         this.in = in;
         this.out = out;
+        this.db = new DMTPDatabse();
 
+        /*
         try {
             this.serverSocketDMTP = new ServerSocket(config.getInt("dmtp.tcp.port"));
             //this.serverSocketDMAP = new ServerSocket(config.getInt("dmap.tcp.port"));
@@ -42,6 +49,7 @@ public class MailboxServer implements IMailboxServer, Runnable {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        */
     }
 
     private void printBootUpMessage(){
@@ -69,6 +77,7 @@ public class MailboxServer implements IMailboxServer, Runnable {
     public void run() {
         // TODO
         //connection to transfer server (functioning)
+        /*
         try {
             transferSocket = serverSocketDMTP.accept();
 
@@ -101,11 +110,12 @@ public class MailboxServer implements IMailboxServer, Runnable {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        /*
-        Thread transferThread = new TransferSocketHandler(config.getInt("dmtp.tcp.port"));
+        */
+
+        Thread transferThread = new TransferSocketHandler(config.getInt("dmtp.tcp.port"), db);
         transferThread.start();
         printBootUpMessage();
-        */
+
     }
 
     @Override
@@ -121,10 +131,12 @@ public class MailboxServer implements IMailboxServer, Runnable {
 
 class TransferSocketHandler extends Thread {
     private ServerSocket serverSocket;
+    private DMTPDatabse db;
 
-    public TransferSocketHandler(int port){
+    public TransferSocketHandler(int port, DMTPDatabse db){
         try {
             this.serverSocket = new ServerSocket(port);
+            this.db = db;
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -139,7 +151,7 @@ class TransferSocketHandler extends Thread {
                 System.out.println("Transfer Server connected");
 
                 // create a new thread object to allow multiple clients
-                Thread transfer = new TransferHandler(socketClient, socketClient.getInputStream(), socketClient.getOutputStream());
+                Thread transfer = new TransferHandler(socketClient, socketClient.getInputStream(), socketClient.getOutputStream(), db);
 
                 // Invoking the start() method
                 transfer.start();
@@ -155,11 +167,13 @@ class TransferHandler extends Thread {
     private Socket socket;
     private InputStream in;
     private OutputStream out;
+    private DMTPDatabse db;
 
-    public TransferHandler(Socket socket, InputStream in, OutputStream out){
+    public TransferHandler(Socket socket, InputStream in, OutputStream out, DMTPDatabse db){
         this.socket = socket;
         this.in = in;
         this.out = out;
+        this.db = db;
     }
 
     @Override
@@ -177,6 +191,7 @@ class TransferHandler extends Thread {
 
             boolean done = false;
             String response;
+            DMTPMessage dmtp = new DMTPMessage();
             while (!done && (response = bfr.readLine()) != null) {
 
                 System.out.println("response: " + response);
@@ -198,12 +213,78 @@ class TransferHandler extends Thread {
                     this.interrupt();
                 }
                 else{
+                    //parse input into DMTP object;
+                    dmtp = parseInputToDMTP(response, dmtp);
+
+                    //put dmtp message into database if fully transmitted
+                    if( dmtp.isValid() && getCommand(response).equals("data")){
+                        db.addMessage(dmtp);
+                    }
+
+                    System.out.println("\nlist:");
+                    System.out.println(db.showMessages());
+                    System.out.println();
+
                     pr.println(response);
+
                 }
                 pr.flush();
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public String getCommand(String input){
+        return (input.split(" ").length >= 1)? input.split(" ")[0] : input;
+    }
+
+    public String getContext(String input){
+        //return ((input.split(" ").length >= 2))? input.substring(input.indexOf(" ")).trim() : null;
+
+        if(input.split(" ").length < 2){
+            return "";
+        }
+        return input.substring(input.indexOf(" ")).trim();
+    }
+
+    public DMTPMessage parseInputToDMTP(String input, DMTPMessage message){
+        if (message == null){
+            message = new DMTPMessage();
+        }
+
+        String command = getCommand(input);
+        String context = getContext(input);
+
+        switch(command){
+            case "begin":
+                message = new DMTPMessage();
+            case "from":
+                message.setSender(context);
+                break;
+            case "to":
+                message.setRecipients(getRecipientsFromInput(context));
+                break;
+            case "subject":
+                message.setSubject(context);
+                break;
+            case "data":
+                message.setData(context);
+                break;
+        }
+
+        return message;
+    }
+
+    public ArrayList<String> getRecipientsFromInput(String context){
+        ArrayList<String> result = new ArrayList<>();
+        String regex = "\\s*,[,\\s]*";
+        String[] recipients = context.split(regex);
+
+        for (String recipient : recipients){
+            result.add(recipient);
+        }
+
+        return result;
     }
 }

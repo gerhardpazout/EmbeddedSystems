@@ -14,7 +14,7 @@ public class DMTPMessage {
         subject = "";
         data = "";
         sender = "";
-        recipients = null;
+        recipients = new ArrayList<>();
     }
 
     public DMTPMessage(String subject, String data, String sender, ArrayList<String> recipients) {
@@ -29,6 +29,28 @@ public class DMTPMessage {
         this.data = data;
         this.sender = sender;
         addRecipient(recipients);
+    }
+
+    @Override
+    public String toString(){
+        String result = "";
+
+        result += "from " + getSender().toString() + "\n";
+        result += "to " + recipientsToString() + "\n";
+        result += "subject " + getSubject() + "\n";
+        result += "data " + getData() + "\n";
+
+        return result;
+    }
+
+    public String recipientsToString(){
+        String result = "";
+
+        for(int i = 0; i < recipients.size(); i++){
+            result += (i < recipients.size() - 1)? recipients.get(i) + ", " : recipients.get(i) ;
+        }
+
+        return result;
     }
 
     public void addRecipient(String recipient){
@@ -75,6 +97,21 @@ public class DMTPMessage {
     }
 
     public boolean isValid(){
+        boolean valid = true;
+
+        if(isNullOrEmpty(sender)){
+            valid = false;
+        }
+        if(recipients == null || recipients.size() <= 0){
+            valid = false;
+        }
+
+        return valid;
+    }
+
+    public static boolean isNullOrEmpty(String str) {
+        if(str != null && !str.isEmpty())
+            return false;
         return true;
     }
 }

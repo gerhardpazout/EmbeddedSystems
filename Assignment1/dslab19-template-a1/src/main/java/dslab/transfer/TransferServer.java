@@ -236,6 +236,7 @@ class ClientHandler extends Thread{
             pr.flush();
 
             boolean done = false;
+            boolean began = false;
             String messageFromClient;
             String responseToClient;
             DMTPMessage dmtp = new DMTPMessage();
@@ -244,7 +245,7 @@ class ClientHandler extends Thread{
                 if(!messageFromClient.isEmpty()){
 
                     messageFromClient = messageFromClient.toLowerCase();
-                    responseToClient = checkClientInput(messageFromClient, dmtp);
+                    responseToClient = "";
 
                     String input = messageFromClient;
 
@@ -264,12 +265,23 @@ class ClientHandler extends Thread{
                         // kill thread
                         this.interrupt();
                     }
+                    else if(!began && !getCommand(input).equals("begin")){
+                        responseToClient = "No DMTP message initiated yet! Type 'begin' to initiate new DMTP Message.";
+                    }
+                    else if(getCommand(input).equals("begin")){
+                        began = true;
+                        dmtp = new DMTPMessage();
+                        responseToClient = checkClientInput(messageFromClient, dmtp);
+                    }
+                    else if(getCommand(input).equals("send")){
+                        responseToClient = checkClientInput(messageFromClient, dmtp);
+                        began = false;
+                    }
                     else{
+                        responseToClient = checkClientInput(messageFromClient, dmtp);
                         pr.println("Transfer Server: " + messageFromClient);
                         pr.flush();
-
                     }
-
                 }
                 else {
                     responseToClient = "error empty input";
@@ -286,15 +298,13 @@ class ClientHandler extends Thread{
     public String checkClientInput(String input, DMTPMessage dmtp){
         String response = "";
         String command = getCommand(input);
+        String context = getContext(input);
 
         if(isNullOrEmpty(input)) return "error no command";
 
-
-        String context = getContext(input);
-
         switch (command){
             case "begin":
-                //
+                dmtp = new DMTPMessage();
                 response = "ok";
                 break;
             case "from":
@@ -319,7 +329,7 @@ class ClientHandler extends Thread{
 
                 break;
             case "subject":
-                dmtp.setData(context);
+                dmtp.setSubject(context);
                 response = "ok";
                 break;
             case "data":
@@ -375,6 +385,17 @@ class ClientHandler extends Thread{
         if(str != null && !str.isEmpty())
             return false;
         return true;
+    }
+
+    public boolean isValidCommand(String command){
+        boolean isValid = false;
+        String[] validCommands = {"begin", "from", "to", "subject", "data", "send"};
+
+        for (String validCommand : validCommands){
+            if (command.equals(validCommand)) isValid = true;
+        }
+
+        return isValid;
     }
 
 }
