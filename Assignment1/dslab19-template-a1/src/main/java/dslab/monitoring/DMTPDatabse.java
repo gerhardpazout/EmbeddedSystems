@@ -30,11 +30,16 @@ public class DMTPDatabse {
     }
 
     public DMTPDatabaseMessage getMessageById(int id){
+        //when there are no messages
+        if(messages == null || messages.size() == 0) return null;
+
+        //look for message
         for (DMTPDatabaseMessage message : messages){
             if(message.getID() == id){
                 return message;
             }
         }
+        //if no message was found
         return null;
     }
 

@@ -41,16 +41,6 @@ public class MailboxServer implements IMailboxServer, Runnable {
         this.in = in;
         this.out = out;
         this.db = new DMTPDatabse();
-
-        /*
-        try {
-            this.serverSocketDMTP = new ServerSocket(config.getInt("dmtp.tcp.port"));
-            //this.serverSocketDMAP = new ServerSocket(config.getInt("dmap.tcp.port"));
-            printBootUpMessage();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        */
     }
 
     private void printBootUpMessage(){
@@ -77,48 +67,11 @@ public class MailboxServer implements IMailboxServer, Runnable {
     @Override
     public void run() {
         // TODO
-        //connection to transfer server (functioning)
-        /*
-        try {
-            transferSocket = serverSocketDMTP.accept();
-
-            InputStreamReader isr = new InputStreamReader(transferSocket.getInputStream());
-            BufferedReader bfr = new BufferedReader(isr);
-
-
-            //String message = bfr.readLine();
-            //System.out.println("transfer server: " + message);
-
-            //Send message to incoming device
-            PrintWriter pr = new PrintWriter(transferSocket.getOutputStream());
-
-            pr.println("You are now connected to the mailbox server!");
-            pr.flush();
-
-
-            boolean done = false;
-            String response;
-            while (!done && (response = bfr.readLine()) != null) {
-
-                //print message that transfer server sent
-                System.out.println("Transfer Server: " + response);
-
-                //send message from mailbox server to transfer server
-                pr.println(response);
-                pr.flush();
-            }
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        */
-
         Thread transferThread = new TransferSocketHandler(config.getInt("dmtp.tcp.port"), db);
         transferThread.start();
         printBootUpMessage();
         Thread client = new ClientSocketHandler(config.getInt("dmap.tcp.port"), db);
         client.start();
-
     }
 
     @Override
@@ -360,6 +313,7 @@ class ClientHandler extends Thread{
 
             boolean done = false;
             boolean began = false;
+            boolean isLoggedIn = false;
             String messageFromClient;
             String responseToClient;
             DMTPMessage dmtp = new DMTPMessage();
@@ -389,7 +343,7 @@ class ClientHandler extends Thread{
                         this.interrupt();
                     }
                     else{
-                        responseToClient = checkClientInput(messageFromClient, dmtp);
+                        responseToClient = checkClientInput(messageFromClient, dmtp, db, isLoggedIn);
                         //pr.println("MailBox Server: " + responseToClient);
                         //pr.flush();
                     }
@@ -406,16 +360,38 @@ class ClientHandler extends Thread{
 
     }
 
-    public String checkClientInput(String input, DMTPMessage dmtp){
-        String response = "";
+    public String checkClientInput(String input, DMTPMessage dmtp, DMTPDatabse db, boolean isLoggedIn){
+        String response = "ok";
         String command = getCommand(input);
         String context = getContext(input);
-
+        int id;
         if(isNullOrEmpty(input)) return "error no command";
 
         switch (command){
             case "login":
                 //
+                System.out.println("calling login / check user function...");
+                //if login successful
+                isLoggedIn = true;
+                break;
+            case "list":
+                response = db.showMessages();
+                break;
+            case "show":
+                response = "error unknown message id";
+
+                id = Integer.parseInt(context);
+                DMTPDatabaseMessage dbMessage = db.getMessageById(id);
+                if (dbMessage != null){
+                    response = response = db.showMessage(id);
+                }
+                break;
+            case "delete":
+                id =  Integer.parseInt(context);
+                boolean isDeleted = db.deleteMessage(id);
+                if(!isDeleted){
+                    response = "error unknown message id";
+                }
                 break;
             default:
                 response = "error protocol error";
