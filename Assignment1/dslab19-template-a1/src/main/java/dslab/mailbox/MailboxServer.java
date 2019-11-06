@@ -4,6 +4,7 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.concurrent.BlockingQueue;
 
 import at.ac.tuwien.dsg.orvell.Shell;
 import dslab.ComponentFactory;
@@ -115,6 +116,8 @@ public class MailboxServer implements IMailboxServer, Runnable {
         Thread transferThread = new TransferSocketHandler(config.getInt("dmtp.tcp.port"), db);
         transferThread.start();
         printBootUpMessage();
+        Thread client = new ClientSocketHandler(config.getInt("dmap.tcp.port"), db);
+        client.start();
 
     }
 
@@ -286,5 +289,174 @@ class TransferHandler extends Thread {
         }
 
         return result;
+    }
+}
+
+
+//Clients
+class ClientSocketHandler extends Thread {
+
+    ServerSocket serverSocket;
+    DMTPDatabse db;
+
+    public ClientSocketHandler(int port, DMTPDatabse db){
+        try {
+            serverSocket = new ServerSocket(port);
+            this.db = db;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void run(){
+        while(true){
+            try {
+                //accept incoming request / get the socket from incoming device
+                Socket socketClient = serverSocket.accept();
+                System.out.println("client connected");
+
+                // create a new thread object to allow multiple clients
+                Thread client = new ClientHandler(socketClient, socketClient.getInputStream(), socketClient.getOutputStream(), db);
+
+                // Invoking the start() method
+                client.start();
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+class ClientHandler extends Thread{
+    private InputStream in;
+    private OutputStream out;
+    private ServerSocket serverSocket;
+    private Socket socket;
+    private DMTPDatabse db;
+
+    // Constructor
+    public ClientHandler(Socket socket, InputStream in, OutputStream out, DMTPDatabse db)
+    {
+        this.socket = socket;
+        this.in = in;
+        this.out = out;
+        this.db = db;
+    }
+
+    @Override
+    public void run()
+    {
+        try {
+            //Receiver message from incoming device
+            InputStreamReader isr = new InputStreamReader(socket.getInputStream());
+            BufferedReader bfr = new BufferedReader(isr);
+
+            //Send message to incoming device
+            PrintWriter pr = new PrintWriter(socket.getOutputStream());
+
+            pr.println("DMAP");
+            pr.flush();
+
+            boolean done = false;
+            boolean began = false;
+            String messageFromClient;
+            String responseToClient;
+            DMTPMessage dmtp = new DMTPMessage();
+
+            while (!done && (messageFromClient = bfr.readLine()) != null) {
+                if(!messageFromClient.isEmpty()){
+
+                    messageFromClient = messageFromClient.toLowerCase();
+                    responseToClient = "";
+
+                    String input = messageFromClient;
+
+                    if(messageFromClient.toLowerCase().trim().equals("quit")){
+                        done = true;
+                        pr.println("ok bye");
+
+                        // close input & output streams
+                        pr.flush();
+                        isr.close();
+                        bfr.close();
+                        pr.close();
+
+                        // close socket connection
+                        socket.close();
+
+                        // kill thread
+                        this.interrupt();
+                    }
+                    else{
+                        responseToClient = checkClientInput(messageFromClient, dmtp);
+                        //pr.println("MailBox Server: " + responseToClient);
+                        //pr.flush();
+                    }
+                }
+                else {
+                    responseToClient = "error empty input";
+                }
+                pr.println("Mailbox Server - Command Response: " + responseToClient);
+                pr.flush();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    public String checkClientInput(String input, DMTPMessage dmtp){
+        String response = "";
+        String command = getCommand(input);
+        String context = getContext(input);
+
+        if(isNullOrEmpty(input)) return "error no command";
+
+        switch (command){
+            case "login":
+                //
+                break;
+            default:
+                response = "error protocol error";
+                break;
+        }
+
+        return response;
+    }
+
+    public String getCommand(String input){
+        return (input.split(" ").length >= 1)? input.split(" ")[0] : input;
+    }
+
+    public String getContext(String input){
+        //return ((input.split(" ").length >= 2))? input.substring(input.indexOf(" ")).trim() : null;
+
+        if(input.split(" ").length < 2){
+            return null;
+        }
+        return input.substring(input.indexOf(" ")).trim();
+    }
+
+    public String[] getRecipients(String context){
+        String regex = "\\s*,[,\\s]*";
+        return context.split(regex);
+    }
+
+    public static boolean isNullOrEmpty(String str) {
+        if(str != null && !str.isEmpty())
+            return false;
+        return true;
+    }
+
+    public boolean isValidCommand(String command){
+        boolean isValid = false;
+        String[] validCommands = {"begin", "from", "to", "subject", "data", "send"};
+
+        for (String validCommand : validCommands){
+            if (command.equals(validCommand)) isValid = true;
+        }
+
+        return isValid;
     }
 }
