@@ -70,7 +70,7 @@ public class MailboxServer implements IMailboxServer, Runnable {
         Thread transferThread = new TransferSocketHandler(config.getInt("dmtp.tcp.port"), db);
         transferThread.start();
         printBootUpMessage();
-        Thread client = new ClientSocketHandler(config.getInt("dmap.tcp.port"), db);
+        Thread client = new ClientSocketHandler(config.getInt("dmap.tcp.port"), db, componentId);
         client.start();
     }
 
@@ -251,11 +251,13 @@ class ClientSocketHandler extends Thread {
 
     ServerSocket serverSocket;
     DMTPDatabse db;
+    String componentId;
 
-    public ClientSocketHandler(int port, DMTPDatabse db){
+    public ClientSocketHandler(int port, DMTPDatabse db, String componentId){
         try {
             serverSocket = new ServerSocket(port);
             this.db = db;
+            this.componentId = componentId;
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -270,7 +272,7 @@ class ClientSocketHandler extends Thread {
                 System.out.println("client connected");
 
                 // create a new thread object to allow multiple clients
-                Thread client = new ClientHandler(socketClient, socketClient.getInputStream(), socketClient.getOutputStream(), db);
+                Thread client = new ClientHandler(socketClient, socketClient.getInputStream(), socketClient.getOutputStream(), db, componentId);
 
                 // Invoking the start() method
                 client.start();
@@ -287,14 +289,17 @@ class ClientHandler extends Thread{
     private ServerSocket serverSocket;
     private Socket socket;
     private DMTPDatabse db;
+    private Config users;
+    boolean isLoggedIn = false;
 
     // Constructor
-    public ClientHandler(Socket socket, InputStream in, OutputStream out, DMTPDatabse db)
+    public ClientHandler(Socket socket, InputStream in, OutputStream out, DMTPDatabse db, String componentId)
     {
         this.socket = socket;
         this.in = in;
         this.out = out;
         this.db = db;
+        users = new Config("users-" + componentId.replace("mailbox-", "") + ".properties");
     }
 
     @Override
@@ -313,7 +318,6 @@ class ClientHandler extends Thread{
 
             boolean done = false;
             boolean began = false;
-            boolean isLoggedIn = false;
             String messageFromClient;
             String responseToClient;
             DMTPMessage dmtp = new DMTPMessage();
@@ -343,7 +347,7 @@ class ClientHandler extends Thread{
                         this.interrupt();
                     }
                     else{
-                        responseToClient = checkClientInput(messageFromClient, dmtp, db, isLoggedIn);
+                        responseToClient = checkClientInput(messageFromClient, dmtp, db);
                         //pr.println("MailBox Server: " + responseToClient);
                         //pr.flush();
                     }
@@ -360,41 +364,71 @@ class ClientHandler extends Thread{
 
     }
 
-    public String checkClientInput(String input, DMTPMessage dmtp, DMTPDatabse db, boolean isLoggedIn){
+    public String checkClientInput(String input, DMTPMessage dmtp, DMTPDatabse db){
         String response = "ok";
         String command = getCommand(input);
         String context = getContext(input);
         int id;
-        if(isNullOrEmpty(input)) return "error no command";
+
+        if(isNullOrEmpty(input)) return "error no command.";
 
         switch (command){
             case "login":
                 //
                 System.out.println("calling login / check user function...");
+
                 //if login successful
-                isLoggedIn = true;
+                String user = getUserFromContext(context);
+                String password = getPasswordFromContext(context);
+                if(!doesUserExist(user)){
+                    response = "error unknown user.";
+                }
+                else if(!checkUser(user, password)){
+                    response = "error unknown password.";
+                }
+                isLoggedIn = checkUser(user, password);
                 break;
             case "list":
-                response = db.showMessages();
+                response = (isLoggedIn)?db.showMessages():"error not logged in.";
                 break;
             case "show":
-                response = "error unknown message id";
+                if(isLoggedIn){
+                    response = "error unknown message id.";
 
-                id = Integer.parseInt(context);
-                DMTPDatabaseMessage dbMessage = db.getMessageById(id);
-                if (dbMessage != null){
-                    response = response = db.showMessage(id);
+                    if(isNullOrEmpty(context)){
+                        response = "error command missing parameter.";
+                    }
+                    else {
+                        id = Integer.parseInt(context);
+                        DMTPDatabaseMessage dbMessage = db.getMessageById(id);
+                        if (dbMessage != null){
+                            response = db.showMessage(id);
+                        }
+                    }
+                }
+                else{
+                    response = "error not logged in.";
                 }
                 break;
             case "delete":
-                id =  Integer.parseInt(context);
-                boolean isDeleted = db.deleteMessage(id);
-                if(!isDeleted){
-                    response = "error unknown message id";
+                if(isLoggedIn) {
+                    if(isNullOrEmpty(context)){
+                        response = "error command missing parameter.";
+                    }
+                    else {
+                        id =  Integer.parseInt(context);
+                        boolean isDeleted = db.deleteMessage(id);
+                        if(!isDeleted){
+                            response = "error unknown message id.";
+                        }
+                    }
+                }
+                else {
+                    response = "error not logged in.";
                 }
                 break;
             default:
-                response = "error protocol error";
+                response = "error protocol error.";
                 break;
         }
 
@@ -434,5 +468,36 @@ class ClientHandler extends Thread{
         }
 
         return isValid;
+    }
+
+    public String getUserFromContext(String context){
+        if (context.split(" ").length < 2){
+            return null;
+        }
+        else {
+            return context.split(" ")[0];
+        }
+    }
+
+    public String getPasswordFromContext(String context){
+        if (context.split(" ").length < 2){
+            return null;
+        }
+        else {
+            return context.split(" ")[1];
+        }
+    }
+
+    public boolean doesUserExist(String user){
+        return users.containsKey(user);
+    }
+
+    public boolean checkUser(String user, String password){
+        try{
+            return (users.getString(user).equals(password));
+        }
+        catch (java.util.MissingResourceException e){
+            return false;
+        }
     }
 }
