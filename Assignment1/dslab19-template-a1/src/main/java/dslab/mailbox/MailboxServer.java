@@ -291,6 +291,8 @@ class ClientHandler extends Thread{
     private DMTPDatabse db;
     private Config users;
     boolean isLoggedIn = false;
+    String componentId;
+    String user = null;
 
     // Constructor
     public ClientHandler(Socket socket, InputStream in, OutputStream out, DMTPDatabse db, String componentId)
@@ -299,6 +301,7 @@ class ClientHandler extends Thread{
         this.in = in;
         this.out = out;
         this.db = db;
+        this.componentId = componentId;
         users = new Config("users-" + componentId.replace("mailbox-", "") + ".properties");
     }
 
@@ -386,10 +389,15 @@ class ClientHandler extends Thread{
                 else if(!checkUser(user, password)){
                     response = "error wrong password.";
                 }
-                isLoggedIn = checkUser(user, password);
+                else{
+                    isLoggedIn = checkUser(user, password);
+                    this.user = user;
+                    System.out.println("login successful!");
+                    System.out.println("USER: " + this.user);
+                }
                 break;
             case "list":
-                response = (isLoggedIn)?db.showMessages():"error not logged in.";
+                response = (isLoggedIn)?db.showMessages(getEmailFromUser(this.user)):"error not logged in.";
                 break;
             case "show":
                 if(isLoggedIn){
@@ -400,10 +408,24 @@ class ClientHandler extends Thread{
                     }
                     else {
                         id = Integer.parseInt(context);
+                        ArrayList<DMTPDatabaseMessage> messagesByUser = db.getMessagesByRecipient(getEmailFromUser(this.user));
+                        if (messagesByUser == null || messagesByUser.size() == 0){
+                            System.out.println("LIST EMPTY");
+                            response = "no messages";
+                        }
+                        else if(db.showMessage(id, getEmailFromUser(this.user)) == null) {
+                            System.out.println("NO MESSAGES FOUND");
+                            response = "no messages";
+                        }
+                        else {
+                            response = db.showMessage(id, getEmailFromUser(this.user));
+                        }
+                        /*
                         DMTPDatabaseMessage dbMessage = db.getMessageById(id);
                         if (dbMessage != null){
                             response = db.showMessage(id);
                         }
+                        */
                     }
                 }
                 else{
@@ -499,5 +521,13 @@ class ClientHandler extends Thread{
         catch (java.util.MissingResourceException e){
             return false;
         }
+    }
+
+    public String getDomainFromComponentId(){
+        return componentId.replace("mailbox-", "").replace("-", ".");
+    }
+    public String getEmailFromUser(String username){
+        System.out.println("EMAIL: " +  username + "@" + getDomainFromComponentId());
+        return username + "@" + getDomainFromComponentId();
     }
 }

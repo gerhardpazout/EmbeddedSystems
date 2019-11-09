@@ -13,7 +13,25 @@ public class DMTPDatabse {
         ArrayList<DMTPDatabaseMessage> result = new ArrayList<>();
 
         for (DMTPDatabaseMessage message : messages){
+            System.out.println("checking message with id: " + message.getID());
+
             if(message.getRecipients().contains(username)){
+                System.out.println();
+                result.add(message);
+            }
+        }
+
+        return result;
+    }
+
+    public ArrayList<DMTPDatabaseMessage> getMessagesByRecipient(String email){
+        ArrayList<DMTPDatabaseMessage> result = new ArrayList<>();
+
+        for (DMTPDatabaseMessage message : messages){
+            System.out.println("checking message with id: " + message.getID());
+
+            if(message.getRecipients().contains(email)){
+                System.out.println();
                 result.add(message);
             }
         }
@@ -56,7 +74,31 @@ public class DMTPDatabse {
         return getMessageById(id).toString();
     }
 
+    public String showMessage(int id, String recipient){
+        DMTPDatabaseMessage message = getMessageById(id);
+        if (message.getRecipients().contains(recipient)){
+            return message.toString();
+        }
+        return null;
+    }
+
     public String showMessages(){
+        if (messages == null || messages.size() <= 0){
+            return "no messages";
+        }
+
+        Collections.sort(messages);
+        String result = "";
+
+        for(DMTPDatabaseMessage message: messages){
+            result += message.getID() + " " + message.getSender() + " " + message.getSubject() + "\n";
+        }
+        return result;
+    }
+
+    public String showMessages(String recipient){
+        ArrayList<DMTPDatabaseMessage> messages = this.getMessagesByRecipient(recipient);
+
         if (messages == null || messages.size() <= 0){
             return "no messages";
         }
