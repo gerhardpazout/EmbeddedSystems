@@ -384,7 +384,7 @@ class ClientHandler extends Thread{
                     response = "error unknown user.";
                 }
                 else if(!checkUser(user, password)){
-                    response = "error unknown password.";
+                    response = "error wrong password.";
                 }
                 isLoggedIn = checkUser(user, password);
                 break;
