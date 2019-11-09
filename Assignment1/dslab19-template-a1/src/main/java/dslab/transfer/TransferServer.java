@@ -86,6 +86,7 @@ class MailboxSocketHandler extends Thread {
     private String host;
     private int port;
     private BlockingQueue<DMTPMessage> data;
+    private Config domains = new Config("domains.properties");
 
     // Constructor
     public MailboxSocketHandler(String host, int port, BlockingQueue<DMTPMessage> data) {
@@ -97,15 +98,15 @@ class MailboxSocketHandler extends Thread {
     @Override
     public void run()
     {
-        try {
-            Socket socket = new Socket(host, port);
+        //try {
+            //Socket socket = new Socket(host, port);
 
             //Receiver message from incoming device
-            InputStreamReader isr = new InputStreamReader(socket.getInputStream());
-            BufferedReader bfr = new BufferedReader(isr);
+            //InputStreamReader isr = new InputStreamReader(socket.getInputStream());
+            //BufferedReader bfr = new BufferedReader(isr);
 
             //Send message to incoming device
-            PrintWriter pr = new PrintWriter(socket.getOutputStream());
+            //PrintWriter pr = new PrintWriter(socket.getOutputStream());
             //pr.println("Whats up mailbox server?");
             //pr.flush();
 
@@ -135,7 +136,7 @@ class MailboxSocketHandler extends Thread {
                         dmtp = data.take();
 
                         for (String recipient : dmtp.getRecipients()){
-                            sendDMPT(pr, dmtp, recipient);
+                            sendDMPT(null, dmtp, recipient);
                         }
 
                     } catch (InterruptedException e) {
@@ -149,13 +150,25 @@ class MailboxSocketHandler extends Thread {
                     e.printStackTrace();
                 }
             }
-
+        /*
         } catch (IOException e) {
             e.printStackTrace();
         }
+        */
     }
 
     public void sendDMPT(PrintWriter pr, DMTPMessage dmtp, String recipient){
+        //connect to Server
+        try {
+            System.out.println("connecting to mailbox server...");
+            System.out.println("RECIPIENT: " + recipient);
+            System.out.println(getMailboxServerIP(recipient));
+            System.out.println(getMailboxServerPort(recipient));
+            socket = new Socket(getMailboxServerIP(recipient), getMailboxServerPort(recipient));
+            pr = new PrintWriter(socket.getOutputStream());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         sendMessage(pr, "begin");
         sendMessage(pr, "from " + dmtp.getSender());
         sendMessage(pr, "to " + recipient);
@@ -167,6 +180,29 @@ class MailboxSocketHandler extends Thread {
     public void sendMessage(PrintWriter pr, String message){
         pr.println(message);
         pr.flush();
+    }
+
+    public int getMailboxServerPort(String email){
+        int port = -1;
+        String fullAddress = getFullAddress(email);
+        port = Integer.parseInt(fullAddress.substring(fullAddress.indexOf(":") + 1));
+        return port;
+    }
+
+    public String getMailboxServerIP(String email){
+        String ip = "";
+        String fullAddress = getFullAddress(email);
+        ip =  fullAddress.substring(0, fullAddress.indexOf(":"));
+        return ip;
+    }
+
+    public String getFullAddress(String email){
+        String domain = getDomainFromEmail(email);
+        return domains.getString(domain);
+    }
+
+    public String getDomainFromEmail(String email){
+        return (email.contains("@"))? email.substring(email.indexOf("@") + 1) : null;
     }
 }
 
@@ -320,8 +356,30 @@ class ClientHandler extends Thread{
                 //get recipients;
                 //TODO: error unknown recipient ford
                 if(!isNullOrEmpty(context)){
-                    dmtp.setRecipients(getRecipients(context));
-                    response = "ok " + getRecipients(context).length;
+
+                    boolean failed = false;
+
+                    System.out.println("checking recipient...");
+                    for (String recipient : getRecipients(context)){
+                        System.out.println("checking recpient " + recipient + "...");
+
+                        if (!failed){
+                            if(!isEmail(recipient)){
+                                failed = true;
+                                response = "error " + recipient + "does not have a valid email format.";
+                            }
+                            else if(!doesRecipientExist(recipient)){
+                                failed = true;
+                                response = "error unknown recipient " + recipient;
+                            }
+                        }
+                    }
+
+                    if(!failed){
+                        //if everything is ok => set recipients
+                        dmtp.setRecipients(getRecipients(context));
+                        response = "ok " + getRecipients(context).length;
+                    }
                 }
                 else{
                     response = "error no recipient";
@@ -396,6 +454,36 @@ class ClientHandler extends Thread{
         }
 
         return isValid;
+    }
+
+    public boolean isEmail(String email){
+        String regex = "^(.+)@(.+)$";
+        return email.matches(regex);
+    }
+
+    public String getDomainFromEmail(String email){
+        return (email.contains("@"))? email.substring(email.indexOf("@") + 1) : null;
+    }
+
+    public String getUsernameFromEmail(String email){
+        return (email.contains("@"))? email.substring(0, email.indexOf("@")) : null;
+    }
+
+    public boolean doesRecipientExist(String email){
+        String username = getUsernameFromEmail(email);
+        String domain = getDomainFromEmail(email);
+        String propertyFilename = "users-" + domain.replace('.', '-') + ".properties";
+
+        try{
+            Config users = new Config(propertyFilename);
+            users.containsKey(users.getString(username));
+
+            return (users.getString(username) != null);
+        }
+        catch (java.util.MissingResourceException e){
+            System.out.println("EXCEPTION!");
+            return false;
+        }
     }
 
 }
