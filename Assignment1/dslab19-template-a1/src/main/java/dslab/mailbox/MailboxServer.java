@@ -85,6 +85,7 @@ public class MailboxServer implements IMailboxServer, Runnable {
     }
 }
 
+// Transfer Socket - DMTP
 class TransferSocketHandler extends Thread {
     private ServerSocket serverSocket;
     private DMTPDatabse db;
@@ -290,9 +291,9 @@ class ClientHandler extends Thread{
     private Socket socket;
     private DMTPDatabse db;
     private Config users;
-    boolean isLoggedIn = false;
-    String componentId;
-    String user = null;
+    private boolean isLoggedIn = false;
+    private String componentId;
+    private String user = null;
 
     // Constructor
     public ClientHandler(Socket socket, InputStream in, OutputStream out, DMTPDatabse db, String componentId)
@@ -358,7 +359,7 @@ class ClientHandler extends Thread{
                 else {
                     responseToClient = "error empty input";
                 }
-                pr.println("Mailbox Server - Command Response: " + responseToClient);
+                pr.println("Server:" + responseToClient);
                 pr.flush();
             }
         } catch (IOException e) {
@@ -535,6 +536,7 @@ class ClientHandler extends Thread{
     public String getDomainFromComponentId(){
         return componentId.replace("mailbox-", "").replace("-", ".");
     }
+
     public String getEmailFromUser(String username){
         System.out.println("EMAIL: " +  username + "@" + getDomainFromComponentId());
         return username + "@" + getDomainFromComponentId();
