@@ -1,14 +1,14 @@
 package dslab.transfer;
 
 import java.io.*;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.net.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
+import at.ac.tuwien.dsg.orvell.Shell;
 import dslab.ComponentFactory;
 import dslab.util.Config;
 import dslab.util.DMTPMessage;
@@ -20,6 +20,8 @@ public class TransferServer implements ITransferServer, Runnable {
     private InputStream in;
     private PrintStream out;
     private BlockingQueue<DMTPMessage> data = new ArrayBlockingQueue<DMTPMessage>(20);
+    private BlockingQueue<DatagramPacket> dataMonitor = new ArrayBlockingQueue<>(20);
+    private String ip = "127.0.0.1";
 
     /**
      * Creates a new server instance.
@@ -40,11 +42,13 @@ public class TransferServer implements ITransferServer, Runnable {
     @Override
     public void run() {
         // TODO
-        Thread clientSocketHandler = new ClientSocketHandler(config.getInt("tcp.port"), data);
-        Thread mailboxSocketHandler = new MailboxSocketHandler("localhost", 11482, data);
+        Thread clientSocketHandler = new ClientSocketHandler(config.getInt("tcp.port"), data, dataMonitor);
+        Thread mailboxSocketHandler = new MailboxSocketHandler("localhost", 11482, data, dataMonitor, config);
+        Thread monitorSocketHandler = new MonitorHandler(config.getString("monitoring.host"), config.getInt("monitoring.port"), dataMonitor);
 
         clientSocketHandler.start();
         mailboxSocketHandler.start();
+        monitorSocketHandler.start();
         printBootUpMessage();
     }
 
@@ -78,6 +82,48 @@ public class TransferServer implements ITransferServer, Runnable {
     }
 }
 
+//Monitoring Server
+class MonitorHandler extends Thread {
+    private String host;
+    private int port;
+    private DatagramSocket socket;
+    private byte[] buf = new byte[256];
+    private BlockingQueue<DatagramPacket> data;
+
+    public MonitorHandler(String host, int port, BlockingQueue<DatagramPacket> data){
+        this.host = host;
+        this.port = port;
+        this.data = data;
+    }
+
+    @Override
+    public void run(){
+        try {
+            System.out.println("trying to create monitoring server connection");
+            socket = new DatagramSocket();
+            System.out.println("connection to monitoring server successful!");
+        } catch (SocketException e) {
+            System.out.println("connection to monitoring server failed!");
+            e.printStackTrace();
+        }
+
+        //if there is data => send data to monitoring server
+        while (true){
+            while( !data.isEmpty() ){
+                try {
+                    DatagramPacket packet = data.take();
+                    System.out.println("sending packet...");
+                    socket.send(packet);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+}
+
 //Mailbox Server
 class MailboxSocketHandler extends Thread {
     private InputStream in;
@@ -86,13 +132,18 @@ class MailboxSocketHandler extends Thread {
     private String host;
     private int port;
     private BlockingQueue<DMTPMessage> data;
+    private BlockingQueue<DatagramPacket> dataMonitor;
+    private Config configTransfer;
+
     private Config domains = new Config("domains.properties");
 
     // Constructor
-    public MailboxSocketHandler(String host, int port, BlockingQueue<DMTPMessage> data) {
+    public MailboxSocketHandler(String host, int port, BlockingQueue<DMTPMessage> data, BlockingQueue dataMonitor, Config configTransfer) {
         this.host = host;
         this.port = port;
         this.data = data;
+        this.dataMonitor = dataMonitor;
+        this.configTransfer = configTransfer;
     }
 
     @Override
@@ -175,6 +226,37 @@ class MailboxSocketHandler extends Thread {
         sendMessage(pr, "subject " + dmtp.getSubject());
         sendMessage(pr, "data " + dmtp.getData());
         System.out.println("DMTP sent!");
+
+
+        System.out.println("Putting data into dataMonitor...");
+        try {
+            dataMonitor.put(createPacket(dmtp.getSender()));
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        System.out.println("Data put into dataMonitor");
+    }
+
+    public DatagramPacket createPacket(String sender){
+        DatagramPacket result = null;
+        InetAddress address = null;
+        try {
+            address = InetAddress.getByName(configTransfer.getString("monitoring.host"));
+
+            String transferIp = "127.0.0.1";
+            int port = configTransfer.getInt("monitoring.port");
+            String message = transferIp + ":" + port + " " + sender;
+            byte[] content = message.getBytes("UTF-8");
+
+            result = new DatagramPacket(content, content.length, address, port);
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+        }
+        catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+            return null;
+        }
+        return result;
     }
 
     public void sendMessage(PrintWriter pr, String message){
@@ -211,11 +293,13 @@ class ClientSocketHandler extends Thread {
 
     ServerSocket serverSocket;
     BlockingQueue<DMTPMessage> data;
+    BlockingQueue dataMonitor;
 
-    public ClientSocketHandler(int port, BlockingQueue<DMTPMessage> data){
+    public ClientSocketHandler(int port, BlockingQueue<DMTPMessage> data, BlockingQueue dataMonitor){
         try {
             serverSocket = new ServerSocket(port);
             this.data = data;
+            this.dataMonitor = dataMonitor;
         } catch (IOException e) {
             e.printStackTrace();
         }
