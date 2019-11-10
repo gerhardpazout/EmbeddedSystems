@@ -396,6 +396,15 @@ class ClientHandler extends Thread{
                     System.out.println("USER: " + this.user);
                 }
                 break;
+            case "logout":
+                if(!isLoggedIn){
+                    response = "error not logged in.";
+                }
+                else{
+                    isLoggedIn = false;
+                    this.user = null;
+                }
+                break;
             case "list":
                 response = (isLoggedIn)?db.showMessages(getEmailFromUser(this.user)):"error not logged in.";
                 break;
@@ -411,11 +420,11 @@ class ClientHandler extends Thread{
                         ArrayList<DMTPDatabaseMessage> messagesByUser = db.getMessagesByRecipient(getEmailFromUser(this.user));
                         if (messagesByUser == null || messagesByUser.size() == 0){
                             System.out.println("LIST EMPTY");
-                            response = "no messages";
+                            response = "no messages.";
                         }
                         else if(db.showMessage(id, getEmailFromUser(this.user)) == null) {
                             System.out.println("NO MESSAGES FOUND");
-                            response = "no messages";
+                            response = "no messages.";
                         }
                         else {
                             response = db.showMessage(id, getEmailFromUser(this.user));
