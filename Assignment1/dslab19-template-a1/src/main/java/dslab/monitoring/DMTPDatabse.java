@@ -3,11 +3,13 @@ package dslab.monitoring;
 import dslab.util.DMTPMessage;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class DMTPDatabse {
-    ArrayList<DMTPDatabaseMessage> messages = new ArrayList<>();
+    CopyOnWriteArrayList<DMTPDatabaseMessage> messages = new CopyOnWriteArrayList<>(); //CopyOnWriteArrayList is Threadsafe
 
     public ArrayList<DMTPDatabaseMessage> getMessagesByUser(String username){
         ArrayList<DMTPDatabaseMessage> result = new ArrayList<>();
@@ -40,7 +42,11 @@ public class DMTPDatabse {
     }
 
     public ArrayList<DMTPDatabaseMessage> getMessages(){
-        return messages;
+        ArrayList<DMTPDatabaseMessage> result = new ArrayList<>();
+        for (DMTPDatabaseMessage message : messages){
+            result.add(message);
+        }
+        return result;
     }
 
     public void addMessage(DMTPMessage message){
