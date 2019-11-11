@@ -43,7 +43,7 @@ public class TransferServer implements ITransferServer, Runnable {
     public void run() {
         // TODO
         Thread clientSocketHandler = new ClientSocketHandler(config.getInt("tcp.port"), data, dataMonitor);
-        Thread mailboxSocketHandler = new MailboxSocketHandler("localhost", 11482, data, dataMonitor, config);
+        Thread mailboxSocketHandler = new MailboxSocketHandler("localhost", 11482, data, dataMonitor, config, ip);
         Thread monitorSocketHandler = new MonitorHandler(config.getString("monitoring.host"), config.getInt("monitoring.port"), dataMonitor);
 
         clientSocketHandler.start();
@@ -87,7 +87,6 @@ class MonitorHandler extends Thread {
     private String host;
     private int port;
     private DatagramSocket socket;
-    private byte[] buf = new byte[256];
     private BlockingQueue<DatagramPacket> data;
 
     public MonitorHandler(String host, int port, BlockingQueue<DatagramPacket> data){
@@ -134,16 +133,19 @@ class MailboxSocketHandler extends Thread {
     private BlockingQueue<DMTPMessage> data;
     private BlockingQueue<DatagramPacket> dataMonitor;
     private Config configTransfer;
+    private String ipTransfer;
 
     private Config domains = new Config("domains.properties");
 
     // Constructor
-    public MailboxSocketHandler(String host, int port, BlockingQueue<DMTPMessage> data, BlockingQueue dataMonitor, Config configTransfer) {
+    public MailboxSocketHandler(String host, int port, BlockingQueue<DMTPMessage> data, BlockingQueue dataMonitor, Config configTransfer, String ipTransfer) {
         this.host = host;
         this.port = port;
         this.data = data;
         this.dataMonitor = dataMonitor;
         this.configTransfer = configTransfer;
+        this.ipTransfer = ipTransfer;
+
     }
 
     @Override
@@ -230,25 +232,25 @@ class MailboxSocketHandler extends Thread {
 
         System.out.println("Putting data into dataMonitor...");
         try {
-            dataMonitor.put(createPacket(dmtp.getSender()));
+            dataMonitor.put(createPacket(recipient));
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
         System.out.println("Data put into dataMonitor");
     }
 
-    public DatagramPacket createPacket(String sender){
+    public DatagramPacket createPacket(String recipient){
         DatagramPacket result = null;
         InetAddress address = null;
         try {
-            address = InetAddress.getByName(configTransfer.getString("monitoring.host"));
+            address = InetAddress.getByName(configTransfer.getString("monitoring.host")); //to send udp to
+            int portUDP = configTransfer.getInt("monitoring.port"); //to send udp to
+            int portReceiver = getMailboxServerPort(recipient);
 
-            String transferIp = "127.0.0.1";
-            int port = configTransfer.getInt("monitoring.port");
-            String message = transferIp + ":" + port + " " + sender;
+            String message = ipTransfer + ":" + portReceiver + " " + recipient;
             byte[] content = message.getBytes("UTF-8");
 
-            result = new DatagramPacket(content, content.length, address, port);
+            result = new DatagramPacket(content, content.length, address, portUDP);
         } catch (UnknownHostException e) {
             e.printStackTrace();
         }

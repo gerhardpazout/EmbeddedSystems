@@ -4,10 +4,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.net.*;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.HashMap;
 
-import at.ac.tuwien.dsg.orvell.Input;
 import at.ac.tuwien.dsg.orvell.Shell;
+import at.ac.tuwien.dsg.orvell.annotation.Command;
 import dslab.ComponentFactory;
 import dslab.util.Config;
 
@@ -15,11 +15,11 @@ public class MonitoringServer implements IMonitoringServer {
 
     private String componentId;
     private Config config;
-    private InputStream in;
-    private PrintStream out;
     private Shell shell;
-    private CopyOnWriteArrayList<String> addresses = new CopyOnWriteArrayList<>();
-    private CopyOnWriteArrayList<String> servers = new CopyOnWriteArrayList<>();
+    private HashMap<String, Integer> addresses = new HashMap<>();
+    private HashMap<String, Integer> servers = new HashMap<>();
+    private DatagramSocket socket;
+    private boolean running;
 
 
     /**
@@ -33,88 +33,62 @@ public class MonitoringServer implements IMonitoringServer {
     public MonitoringServer(String componentId, Config config, InputStream in, PrintStream out) {
         this.componentId = componentId;
         this.config = config;
-        this.in = in;
-        this.out = out;
+
+        shell = new Shell(in, out);
+        shell.register(this);
     }
 
     @Override
     public void run() {
-        Thread transferConnection = new TransferConnection(config, addresses, servers);
-        transferConnection.start();
-    }
-
-    @Override
-    public void addresses() {
-        // TODO
-    }
-
-    @Override
-    public void servers() {
-        // TODO
-    }
-
-    @Override
-    public void shutdown() {
-        // TODO
-    }
-
-    public static void main(String[] args) throws Exception {
-        IMonitoringServer server = ComponentFactory.createMonitoringServer(args[0], System.in, System.out);
-        server.run();
-    }
-
-}
-
-class TransferConnection extends Thread {
-
-    private String componentId;
-    private Config config;
-    private DatagramSocket socket;
-    private byte[] buf = new byte[256];
-    private boolean running = false;
-    private CopyOnWriteArrayList<String> addresses;
-    private CopyOnWriteArrayList<String> servers;
-
-    public TransferConnection(Config config, CopyOnWriteArrayList addresses, CopyOnWriteArrayList servers){
-        this.config = config;
-        this.addresses = addresses;
-        this.servers = servers;
+        //start connection
         try {
             socket = new DatagramSocket(config.getInt("udp.port"));
-            running = true;
             printBootUpMessage();
-
-        } catch (IOException e) {
+        } catch (SocketException e) {
             e.printStackTrace();
         }
+
+        //start receiving udp packets
+        new Thread(() -> {
+            running = true;
+            byte[] buf;
+
+            while (running) {
+                buf = new byte[1024];
+                DatagramPacket packet = new DatagramPacket(buf, buf.length);
+
+                try {
+                    socket.receive(packet);
+
+                    String message = new String(buf, 0, packet.getLength());
+                    incrementHashMap(servers, getServerKeyFromMessage(message));
+                    incrementHashMap(addresses, getAddressKeyFromMessage(message));
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+
+        //start shell
+        new Thread(() -> shell.run()).start();
     }
 
-   @Override
-    public void run(){
-        running = true;
+    @Override
+    @Command
+    public void addresses() {
+        addresses.forEach((key,value) -> System.out.println(key + "  " + value));
+    }
 
-        while (running) {
-            DatagramPacket packet = new DatagramPacket(buf, buf.length);
-            try {
-                socket.receive(packet);
+    @Override
+    @Command
+    public void servers() {
+        servers.forEach((key,value) -> System.out.println(key + "  " + value));
+    }
 
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-            InetAddress address = packet.getAddress();
-            int port = packet.getPort();
-            packet = new DatagramPacket(buf, buf.length, address, port);
-            String received
-                    = new String(packet.getData(), 0, packet.getLength());
-
-            System.out.println("RECEIVED: " + received);
-            if (received.equals("end")) {
-                running = false;
-                continue;
-            }
-            //socket.send(packet);
-        }
+    @Override
+    @Command
+    public void shutdown() {
         socket.close();
     }
 
@@ -128,4 +102,35 @@ class TransferConnection extends Thread {
                         "' in terminal app to connect"
         );
     }
+
+    public void incrementHashMap(HashMap<String, Integer> map, String key){
+        if (map.containsKey(key)){
+            map.replace(key, map.get(key)+1);
+        }
+        else {
+            map.put(key, 1);
+        }
+    }
+
+    public String getAddressFromMessage(String message){
+        return message.substring(0, message.indexOf(":"));
+    }
+
+    public String getPortFromMessage(String message){
+        return message.substring(message.indexOf(":") + 1, message.indexOf(" "));
+    }
+
+    public String getServerKeyFromMessage(String message){
+        return getAddressFromMessage(getAddressFromMessage(message) + ":" + getPortFromMessage(message));
+    }
+
+    public String getAddressKeyFromMessage(String message){
+        return message.split(" ")[1];
+    }
+
+    public static void main(String[] args) throws Exception {
+        IMonitoringServer server = ComponentFactory.createMonitoringServer(args[0], System.in, System.out);
+        server.run();
+    }
+
 }
