@@ -382,19 +382,24 @@ class ClientHandler extends Thread{
                 System.out.println("calling login / check user function...");
 
                 //if login successful
-                String user = getUserFromContext(context);
-                String password = getPasswordFromContext(context);
-                if(!doesUserExist(user)){
-                    response = "error unknown user.";
+                if(isNullOrEmpty(context)){
+                   response = "error command missing parameter.";
                 }
-                else if(!checkUser(user, password)){
-                    response = "error wrong password.";
-                }
-                else{
-                    isLoggedIn = checkUser(user, password);
-                    this.user = user;
-                    System.out.println("login successful!");
-                    System.out.println("USER: " + this.user);
+                else {
+                    String user = getUserFromContext(context);
+                    String password = getPasswordFromContext(context);
+                    if(!doesUserExist(user)){
+                        response = "error unknown user.";
+                    }
+                    else if(!checkUser(user, password)){
+                        response = "error wrong password.";
+                    }
+                    else{
+                        isLoggedIn = checkUser(user, password);
+                        this.user = user;
+                        System.out.println("login successful!");
+                        System.out.println("USER: " + this.user);
+                    }
                 }
                 break;
             case "logout":
