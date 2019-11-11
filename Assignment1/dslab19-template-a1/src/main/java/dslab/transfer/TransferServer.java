@@ -371,7 +371,7 @@ class ClientHandler extends Thread{
             //Send message to incoming device
             PrintWriter pr = new PrintWriter(socket.getOutputStream());
 
-            pr.println("Transfer Server: Welcome! Type 'quit' to exit.");
+            pr.println("S: Welcome! Type 'quit' to exit.");
             pr.flush();
 
             boolean done = false;
@@ -390,7 +390,7 @@ class ClientHandler extends Thread{
 
                     if(messageFromClient.toLowerCase().trim().equals("quit")){
                         done = true;
-                        pr.println("Transfer Server: WOW! I don't need you anyways! Go to hell! Bye!");
+                        pr.println("ok bye");
 
                         // close input & output streams
                         pr.flush();
@@ -418,14 +418,14 @@ class ClientHandler extends Thread{
                     }
                     else{
                         responseToClient = checkClientInput(messageFromClient, dmtp);
-                        pr.println("Transfer Server: " + messageFromClient);
+                        pr.println("S: " + messageFromClient);
                         pr.flush();
                     }
                 }
                 else {
                     responseToClient = "error empty input";
                 }
-                pr.println("Transfer Server - Command Response: " + responseToClient);
+                pr.println("S: " + responseToClient);
                 pr.flush();
             }
         } catch (IOException e) {
