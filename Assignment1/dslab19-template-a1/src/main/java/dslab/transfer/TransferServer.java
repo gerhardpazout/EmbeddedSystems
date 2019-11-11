@@ -4,11 +4,13 @@ import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
 import at.ac.tuwien.dsg.orvell.Shell;
+import at.ac.tuwien.dsg.orvell.annotation.Command;
 import dslab.ComponentFactory;
 import dslab.util.Config;
 import dslab.util.DMTPMessage;
@@ -22,6 +24,9 @@ public class TransferServer implements ITransferServer, Runnable {
     private BlockingQueue<DMTPMessage> data = new ArrayBlockingQueue<DMTPMessage>(20);
     private BlockingQueue<DatagramPacket> dataMonitor = new ArrayBlockingQueue<>(20);
     private String ip = "127.0.0.1";
+    private ServerSocket serverSocket;
+    private boolean running = true;
+    private Shell shell;
 
     /**
      * Creates a new server instance.
@@ -37,12 +42,14 @@ public class TransferServer implements ITransferServer, Runnable {
         this.config = config;
         this.in = in;
         this.out = out;
+        this.shell = new Shell(in, out);
+        shell.register(this);
     }
 
     @Override
     public void run() {
         // TODO
-        Thread clientSocketHandler = new ClientSocketHandler(config.getInt("tcp.port"), data, dataMonitor);
+        Thread clientSocketHandler = new ClientSocketHandler(config.getInt("tcp.port"), data, dataMonitor, serverSocket);
         Thread mailboxSocketHandler = new MailboxSocketHandler("localhost", 11482, data, dataMonitor, config, ip);
         Thread monitorSocketHandler = new MonitorHandler(config.getString("monitoring.host"), config.getInt("monitoring.port"), dataMonitor);
 
@@ -50,6 +57,8 @@ public class TransferServer implements ITransferServer, Runnable {
         mailboxSocketHandler.start();
         monitorSocketHandler.start();
         printBootUpMessage();
+
+        new Thread(() -> shell.run()).start();
     }
 
     private void printBootUpMessage(){
@@ -64,11 +73,12 @@ public class TransferServer implements ITransferServer, Runnable {
     }
 
     @Override
+    @Command
     public void shutdown() {
         // TODO
+        System.out.println("shutting down connection");
         /*
         try {
-            System.out.println("shutting down connection");
             serverSocket.close();
         } catch (IOException e) {
             e.printStackTrace();
@@ -151,92 +161,82 @@ class MailboxSocketHandler extends Thread {
     @Override
     public void run()
     {
-        //try {
-            //Socket socket = new Socket(host, port);
+        while (true){
+            DMTPMessage dmtp;
+            while( !data.isEmpty() ){
 
-            //Receiver message from incoming device
-            //InputStreamReader isr = new InputStreamReader(socket.getInputStream());
-            //BufferedReader bfr = new BufferedReader(isr);
-
-            //Send message to incoming device
-            //PrintWriter pr = new PrintWriter(socket.getOutputStream());
-            //pr.println("Whats up mailbox server?");
-            //pr.flush();
-
-            /*
-            boolean done = false;
-            String response;
-            while (!done && (response = bfr.readLine()) != null) {
-
-                //output what mailbox server sent
-                System.out.println("Mailbox Server: " + response);
-
-                //send message from client to mailbox server
                 try {
-                    String messageFromClient = (String)data.take();
-                    pr.println(messageFromClient);
-                    pr.flush();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-            */
-            while (true){
-                DMTPMessage dmtp;
-                while( !data.isEmpty() ){
+                    dmtp = data.take();
 
-                    try {
-                        dmtp = data.take();
-
-                        for (String recipient : dmtp.getRecipients()){
-                            sendDMPT(null, dmtp, recipient);
-                        }
-
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
+                    for (String recipient : dmtp.getRecipients()){
+                        sendDMPT(null, dmtp, recipient);
                     }
-                }
 
-                try {
-                    Thread.sleep(1000);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
             }
-        /*
-        } catch (IOException e) {
-            e.printStackTrace();
+
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
-        */
     }
 
     public void sendDMPT(PrintWriter pr, DMTPMessage dmtp, String recipient){
         //connect to Server
         try {
-            System.out.println("connecting to mailbox server...");
-            System.out.println("RECIPIENT: " + recipient);
-            System.out.println(getMailboxServerIP(recipient));
-            System.out.println(getMailboxServerPort(recipient));
             socket = new Socket(getMailboxServerIP(recipient), getMailboxServerPort(recipient));
             pr = new PrintWriter(socket.getOutputStream());
+
+            //send dmtp to mailbox server
+            dmptProtocol(pr, dmtp, recipient);
+        } catch (ConnectException e){
+            //server down => send error mail to sender
+            try {
+                socket = new Socket(getMailboxServerIP(dmtp.getSender()), getMailboxServerPort(dmtp.getSender()));
+                pr = new PrintWriter(socket.getOutputStream());
+
+                String oldSender = dmtp.getSender();
+                dmtp.setSender("mailer@" + ipTransfer);
+                dmtp.setRecipients(new String[]{oldSender});
+                dmtp.setSubject("error - could not send email");
+                dmtp.setData("The message could not be delivered, because the server "
+                        + getDomainFromEmail(recipient)
+                        + "was not reachable");
+
+                //send dmtp to mailbox server
+                dmptProtocol(pr, dmtp, recipient);
+
+            } catch (ConnectException e1){
+                // server from sender down too => discard error mail
+                //e1.printStackTrace();
+            } catch (NullPointerException e1){
+                //
+            } catch (IOException e1) {
+                //e1.printStackTrace();
+            }
+            //e.printStackTrace();
         } catch (IOException e) {
-            e.printStackTrace();
+            //e.printStackTrace();
         }
+    }
+
+    public void dmptProtocol(PrintWriter pr, DMTPMessage dmtp, String recipient){
         sendMessage(pr, "begin");
         sendMessage(pr, "from " + dmtp.getSender());
-        sendMessage(pr, "to " + recipient);
+        sendMessage(pr, "to " + dmtp.recipientsToString());
         sendMessage(pr, "subject " + dmtp.getSubject());
         sendMessage(pr, "data " + dmtp.getData());
-        System.out.println("DMTP sent!");
+        //System.out.println("DMTP sent!");
 
-
-        System.out.println("Putting data into dataMonitor...");
         try {
             dataMonitor.put(createPacket(recipient));
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        System.out.println("Data put into dataMonitor");
     }
 
     public DatagramPacket createPacket(String recipient){
@@ -262,6 +262,7 @@ class MailboxSocketHandler extends Thread {
     }
 
     public void sendMessage(PrintWriter pr, String message){
+        System.out.println(message);
         pr.println(message);
         pr.flush();
     }
@@ -282,11 +283,19 @@ class MailboxSocketHandler extends Thread {
 
     public String getFullAddress(String email){
         String domain = getDomainFromEmail(email);
-        return domains.getString(domain);
+        return (doesDomainExist(domain))?domains.getString(domain):null;
     }
 
     public String getDomainFromEmail(String email){
         return (email.contains("@"))? email.substring(email.indexOf("@") + 1) : null;
+    }
+
+    public boolean doesDomainExist(String domain){
+        Config domains = new Config("domains.properties");
+        if(domains.containsKey(domain)){
+            return true;
+        }
+        return false;
     }
 }
 
@@ -296,19 +305,24 @@ class ClientSocketHandler extends Thread {
     ServerSocket serverSocket;
     BlockingQueue<DMTPMessage> data;
     BlockingQueue dataMonitor;
+    int port;
 
-    public ClientSocketHandler(int port, BlockingQueue<DMTPMessage> data, BlockingQueue dataMonitor){
-        try {
-            serverSocket = new ServerSocket(port);
+    public ClientSocketHandler(int port, BlockingQueue<DMTPMessage> data, BlockingQueue dataMonitor, ServerSocket serverSocket){
+
+            this.serverSocket = serverSocket;
             this.data = data;
             this.dataMonitor = dataMonitor;
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+            this.port = port;
+
     }
 
     @Override
     public void run(){
+        try {
+            serverSocket = new ServerSocket(port);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         while(true){
             try {
                 //accept incoming request / get the socket from incoming device
@@ -571,5 +585,4 @@ class ClientHandler extends Thread{
             return false;
         }
     }
-
 }
