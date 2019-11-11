@@ -88,7 +88,10 @@ public class TransferServer implements ITransferServer, Runnable {
 
     public static void main(String[] args) throws Exception {
         ITransferServer server = ComponentFactory.createTransferServer(args[0], System.in, System.out);
-        server.run();
+        //server.run();
+        ITransferServer server2 = ComponentFactory.createTransferServer("transfer-2", System.in, System.out);
+        new Thread(server::run).start();
+        //new Thread(server2::run).start();
     }
 }
 
