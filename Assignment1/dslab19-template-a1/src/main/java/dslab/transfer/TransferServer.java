@@ -404,6 +404,23 @@ class ClientHandler extends Thread{
                         // kill thread
                         this.interrupt();
                     }
+                    else if(!isValidCommand(getCommand(input))){
+                        responseToClient = "error protocol error";
+                        pr.println("S: " + responseToClient);
+                        pr.flush();
+
+                        // close input & output streams
+                        pr.flush();
+                        isr.close();
+                        bfr.close();
+                        pr.close();
+
+                        // close socket connection
+                        socket.close();
+
+                        // kill thread
+                        this.interrupt();
+                    }
                     else if(!began && !getCommand(input).equals("begin")){
                         responseToClient = "No DMTP message initiated yet! Type 'begin' to initiate new DMTP Message.";
                     }
@@ -429,7 +446,8 @@ class ClientHandler extends Thread{
                 pr.flush();
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            //e.printStackTrace();
+            System.out.println("client disconnected");
         }
 
     }

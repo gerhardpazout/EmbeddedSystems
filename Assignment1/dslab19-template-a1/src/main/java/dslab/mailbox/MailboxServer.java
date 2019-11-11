@@ -356,6 +356,23 @@ class ClientHandler extends Thread{
                         // kill thread
                         this.interrupt();
                     }
+                    else if(!isValidCommand(getCommand(input))){
+                        responseToClient = "error protocol error";
+                        pr.println("S: " + responseToClient);
+                        pr.flush();
+
+                        // close input & output streams
+                        pr.flush();
+                        isr.close();
+                        bfr.close();
+                        pr.close();
+
+                        // close socket connection
+                        socket.close();
+
+                        // kill thread
+                        this.interrupt();
+                    }
                     else{
                         responseToClient = checkClientInput(messageFromClient, dmtp, db);
                         //pr.println("MailBox Server: " + responseToClient);
@@ -369,7 +386,8 @@ class ClientHandler extends Thread{
                 pr.flush();
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            //e.printStackTrace();
+            System.out.println("client disconnected");
         }
 
     }
@@ -504,7 +522,7 @@ class ClientHandler extends Thread{
 
     public boolean isValidCommand(String command){
         boolean isValid = false;
-        String[] validCommands = {"begin", "from", "to", "subject", "data", "send"};
+        String[] validCommands = {"login", "list", "show", "delete", "logout"};
 
         for (String validCommand : validCommands){
             if (command.equals(validCommand)) isValid = true;
