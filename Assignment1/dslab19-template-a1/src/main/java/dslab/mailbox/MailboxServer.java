@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.concurrent.BlockingQueue;
 
 import at.ac.tuwien.dsg.orvell.Shell;
+import at.ac.tuwien.dsg.orvell.annotation.Command;
 import dslab.ComponentFactory;
 import dslab.monitoring.DMTPDatabaseMessage;
 import dslab.monitoring.DMTPDatabse;
@@ -26,6 +27,7 @@ public class MailboxServer implements IMailboxServer, Runnable {
     private OutputStream out;
     private Socket transferSocket;
     private DMTPDatabse db;
+    private Shell shell;
 
     /**
      * Creates a new server instance.
@@ -42,6 +44,10 @@ public class MailboxServer implements IMailboxServer, Runnable {
         this.in = in;
         this.out = out;
         this.db = new DMTPDatabse();
+
+        shell = new Shell(in, out);
+        shell.register(this);
+
     }
 
     private void printBootUpMessage(){
@@ -89,6 +95,7 @@ public class MailboxServer implements IMailboxServer, Runnable {
     }
 
     @Override
+    @Command
     public void shutdown() {
         //close DMTP
         if(serverSocketDMTP != null && !serverSocketDMTP.isClosed()){
