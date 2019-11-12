@@ -36,6 +36,8 @@ public class MonitoringServer implements IMonitoringServer {
 
         shell = new Shell(in, out);
         shell.register(this);
+
+        run();
     }
 
     @Override
@@ -78,7 +80,8 @@ public class MonitoringServer implements IMonitoringServer {
         }).start();
 
         //start shell
-        new Thread(() -> shell.run()).start();
+        //new Thread(() -> shell.run()).start();
+        shell.run();
     }
 
     @Override
@@ -153,7 +156,7 @@ public class MonitoringServer implements IMonitoringServer {
 
     public static void main(String[] args) throws Exception {
         IMonitoringServer server = ComponentFactory.createMonitoringServer(args[0], System.in, System.out);
-        server.run();
+        //server.run();
     }
 
 }

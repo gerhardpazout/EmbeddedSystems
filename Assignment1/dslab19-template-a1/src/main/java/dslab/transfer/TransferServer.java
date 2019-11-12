@@ -55,10 +55,14 @@ public class TransferServer implements ITransferServer, Runnable {
             e.printStackTrace();
         }
 
+        /*
         shell.register("shutdown", (input, context) -> {
             shutdown();
             throw new StopShellException();
         });
+        */
+        shell.register(this);
+        run();
     }
 
     @Override
@@ -74,7 +78,8 @@ public class TransferServer implements ITransferServer, Runnable {
         monitorSocketHandler.start();
         printBootUpMessage();
 
-        new Thread(() -> shell.run()).start();
+        //new Thread(() -> shell.run()).start();
+        shell.run();
     }
 
     private void printBootUpMessage(){
@@ -124,7 +129,7 @@ public class TransferServer implements ITransferServer, Runnable {
     public static void main(String[] args) throws Exception {
         ITransferServer server = ComponentFactory.createTransferServer(args[0], System.in, System.out);
         //server.run();
-        new Thread(server::run).start();
+        //new Thread(server::run).start();
     }
 }
 

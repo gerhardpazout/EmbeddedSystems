@@ -48,6 +48,7 @@ public class MailboxServer implements IMailboxServer, Runnable {
         shell = new Shell(in, out);
         shell.register(this);
 
+        run();
     }
 
     private void printBootUpMessage(){
@@ -92,6 +93,9 @@ public class MailboxServer implements IMailboxServer, Runnable {
         client.start();
 
         printBootUpMessage();
+
+        //new Thread(()->shell.run()).start();
+        shell.run();
     }
 
     @Override
@@ -118,7 +122,7 @@ public class MailboxServer implements IMailboxServer, Runnable {
     public static void main(String[] args) throws Exception {
         IMailboxServer server = ComponentFactory.createMailboxServer(args[0], System.in, System.out);
         //server.run();
-        new Thread(server::run).start();
+        //new Thread(server::run).start();
     }
 }
 
