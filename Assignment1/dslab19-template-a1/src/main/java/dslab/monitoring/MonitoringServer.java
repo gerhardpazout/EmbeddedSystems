@@ -121,7 +121,7 @@ public class MonitoringServer implements IMonitoringServer {
     }
 
     public String getServerKeyFromMessage(String message){
-        return getAddressFromMessage(getAddressFromMessage(message) + ":" + getPortFromMessage(message));
+        return getAddressFromMessage(message) + ":" + getPortFromMessage(message);
     }
 
     public String getAddressKeyFromMessage(String message){
