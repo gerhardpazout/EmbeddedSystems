@@ -268,6 +268,7 @@ class MailboxSocketHandler extends Thread {
         sendMessage(pr, "to " + dmtp.recipientsToString());
         sendMessage(pr, "subject " + dmtp.getSubject());
         sendMessage(pr, "data " + dmtp.getData());
+        sendMessage(pr, "quit");
         //System.out.println("DMTP sent!");
 
         try {
@@ -459,40 +460,15 @@ class ClientHandler extends Thread{
                     if(messageFromClient.toLowerCase().trim().equals("quit")){
                         pr.println("ok bye");
 
-                        /*
-                        // close input & output streams
-                        pr.flush();
-                        isr.close();
-                        bfr.close();
-                        pr.close();
-
-                        // close socket connection
-                        socket.close();
-                        */
                         closeConnection();
-
-                        // kill thread
-                        this.interrupt();
                     }
                     else if(!isValidCommand(getCommand(input))){
                         responseToClient = "error protocol error";
                         pr.println("S: " + responseToClient);
                         pr.flush();
 
-                        /*
-                        // close input & output streams
-                        pr.flush();
-                        isr.close();
-                        bfr.close();
-                        pr.close();
-
-                        // close socket connection
-                        socket.close();
-                        */
                         closeConnection();
-
-                        // kill thread
-                        this.interrupt();
+                        
                     }
                     else if(!began && !getCommand(input).equals("begin")){
                         responseToClient = "No DMTP message initiated yet! Type 'begin' to initiate new DMTP Message.";

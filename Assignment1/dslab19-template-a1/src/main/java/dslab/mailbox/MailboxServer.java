@@ -1,6 +1,7 @@
 package dslab.mailbox;
 
 import java.io.*;
+import java.net.ConnectException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -67,16 +68,44 @@ public class MailboxServer implements IMailboxServer, Runnable {
     @Override
     public void run() {
         // TODO
-        Thread transferThread = new TransferSocketHandler(config.getInt("dmtp.tcp.port"), db);
+        try {
+            serverSocketDMTP = new ServerSocket(config.getInt("dmtp.tcp.port"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        try {
+            serverSocketDMAP = new ServerSocket(config.getInt("dmap.tcp.port"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        Thread transferThread = new TransferSocketHandler(config.getInt("dmtp.tcp.port"), db, serverSocketDMTP);
         transferThread.start();
-        printBootUpMessage();
-        Thread client = new ClientSocketHandler(config.getInt("dmap.tcp.port"), db, componentId);
+
+        Thread client = new ClientSocketHandler(config.getInt("dmap.tcp.port"), db, componentId, serverSocketDMAP);
         client.start();
+
+        printBootUpMessage();
     }
 
     @Override
     public void shutdown() {
-        // TODO
+        //close DMTP
+        if(serverSocketDMTP != null && !serverSocketDMTP.isClosed()){
+            try {
+                serverSocketDMTP.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        //close DMAP
+        if(serverSocketDMAP != null && !serverSocketDMAP.isClosed()){
+            try {
+                serverSocketDMAP.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     public static void main(String[] args) throws Exception {
@@ -96,13 +125,17 @@ class TransferSocketHandler extends Thread {
     private ServerSocket serverSocket;
     private DMTPDatabse db;
 
-    public TransferSocketHandler(int port, DMTPDatabse db){
+    public TransferSocketHandler(int port, DMTPDatabse db, ServerSocket serverSocketDMTP){
+        /*
         try {
             this.serverSocket = new ServerSocket(port);
             this.db = db;
         } catch (IOException e) {
             e.printStackTrace();
         }
+        */
+        this.serverSocket = serverSocketDMTP;
+        this.db = db;
     }
 
     @Override
@@ -114,7 +147,7 @@ class TransferSocketHandler extends Thread {
                 System.out.println("Transfer Server connected");
 
                 // create a new thread object to allow multiple clients
-                Thread transfer = new TransferHandler(socketClient, socketClient.getInputStream(), socketClient.getOutputStream(), db);
+                Thread transfer = new TransferHandler(serverSocket, socketClient, socketClient.getInputStream(), socketClient.getOutputStream(), db);
 
                 // Invoking the start() method
                 transfer.start();
@@ -127,12 +160,20 @@ class TransferSocketHandler extends Thread {
 }
 class TransferHandler extends Thread {
 
+    private ServerSocket serverSocket;
     private Socket socket;
     private InputStream in;
     private OutputStream out;
     private DMTPDatabse db;
 
-    public TransferHandler(Socket socket, InputStream in, OutputStream out, DMTPDatabse db){
+    InputStreamReader isr;
+    BufferedReader bfr;
+    PrintWriter pr;
+
+
+
+    public TransferHandler(ServerSocket serverSocket, Socket socket, InputStream in, OutputStream out, DMTPDatabse db){
+        this.serverSocket = serverSocket;
         this.socket = socket;
         this.in = in;
         this.out = out;
@@ -143,11 +184,11 @@ class TransferHandler extends Thread {
     public void run() {
         try {
             //Receiver message from incoming device
-            InputStreamReader isr = new InputStreamReader(socket.getInputStream());
-            BufferedReader bfr = new BufferedReader(isr);
+            isr = new InputStreamReader(socket.getInputStream());
+            bfr = new BufferedReader(isr);
 
             //Send message to incoming device
-            PrintWriter pr = new PrintWriter(socket.getOutputStream());
+            pr = new PrintWriter(socket.getOutputStream());
 
             pr.println("You are connected to the mailbox server");
             pr.flush();
@@ -155,14 +196,15 @@ class TransferHandler extends Thread {
             boolean done = false;
             String response;
             DMTPMessage dmtp = new DMTPMessage();
-            while (!done && (response = bfr.readLine()) != null) {
+            while (!serverSocket.isClosed() && !done && (response = bfr.readLine()) != null) {
 
                 System.out.println("response: " + response);
 
                 if(response.toLowerCase().trim().equals("quit")){
                     done = true;
-                    pr.println("WOW! I don't need you anyways! Go to hell! Bye!");
+                    pr.println("ok bye");
 
+                    /*
                     // close input & output streams
                     pr.flush();
                     isr.close();
@@ -174,6 +216,8 @@ class TransferHandler extends Thread {
 
                     // kill thread
                     this.interrupt();
+                    */
+                    closeConnection();
                 }
                 else{
                     //parse input into DMTP object;
@@ -185,7 +229,7 @@ class TransferHandler extends Thread {
                     }
 
                     System.out.println("\nlist:");
-                    System.out.println(db.showMessages());
+                    //System.out.println(db.showMessages());
                     System.out.println();
 
                     pr.println(response);
@@ -193,9 +237,41 @@ class TransferHandler extends Thread {
                 }
                 pr.flush();
             }
+        } catch (ConnectException e){
+            System.out.println("ConnectException");
+            closeConnection();
+        }
+        catch (IOException e) {
+            System.out.println("IOException");
+            closeConnection();
+            //e.printStackTrace();
+        }
+    }
+
+    public void closeConnection(){
+        // close input & output streams
+        pr.flush();
+        try {
+            isr.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
+        try {
+            bfr.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        pr.close();
+
+        // close socket connection
+        try {
+            socket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        // kill thread
+        this.interrupt();
     }
 
     public String getCommand(String input){
@@ -260,7 +336,8 @@ class ClientSocketHandler extends Thread {
     DMTPDatabse db;
     String componentId;
 
-    public ClientSocketHandler(int port, DMTPDatabse db, String componentId){
+    public ClientSocketHandler(int port, DMTPDatabse db, String componentId, ServerSocket serverSocket){
+        /*
         try {
             serverSocket = new ServerSocket(port);
             this.db = db;
@@ -268,6 +345,10 @@ class ClientSocketHandler extends Thread {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        */
+        this.db = db;
+        this.componentId = componentId;
+        this.serverSocket = serverSocket;
     }
 
     @Override
@@ -279,7 +360,7 @@ class ClientSocketHandler extends Thread {
                 System.out.println("client connected");
 
                 // create a new thread object to allow multiple clients
-                Thread client = new ClientHandler(socketClient, socketClient.getInputStream(), socketClient.getOutputStream(), db, componentId);
+                Thread client = new ClientHandler(serverSocket, socketClient, socketClient.getInputStream(), socketClient.getOutputStream(), db, componentId);
 
                 // Invoking the start() method
                 client.start();
@@ -301,9 +382,14 @@ class ClientHandler extends Thread{
     private String componentId;
     private String user = null;
 
+    InputStreamReader isr;
+    BufferedReader bfr;
+    PrintWriter pr;
+
     // Constructor
-    public ClientHandler(Socket socket, InputStream in, OutputStream out, DMTPDatabse db, String componentId)
+    public ClientHandler(ServerSocket serverSocket, Socket socket, InputStream in, OutputStream out, DMTPDatabse db, String componentId)
     {
+        this.serverSocket = serverSocket;
         this.socket = socket;
         this.in = in;
         this.out = out;
@@ -317,11 +403,11 @@ class ClientHandler extends Thread{
     {
         try {
             //Receiver message from incoming device
-            InputStreamReader isr = new InputStreamReader(socket.getInputStream());
-            BufferedReader bfr = new BufferedReader(isr);
+            isr = new InputStreamReader(socket.getInputStream());
+            bfr = new BufferedReader(isr);
 
             //Send message to incoming device
-            PrintWriter pr = new PrintWriter(socket.getOutputStream());
+            pr = new PrintWriter(socket.getOutputStream());
 
             pr.println("DMAP");
             pr.flush();
@@ -332,7 +418,7 @@ class ClientHandler extends Thread{
             String responseToClient;
             DMTPMessage dmtp = new DMTPMessage();
 
-            while (!done && (messageFromClient = bfr.readLine()) != null) {
+            while (!serverSocket.isClosed() && !done && (messageFromClient = bfr.readLine()) != null) {
                 if(!messageFromClient.isEmpty()){
 
                     messageFromClient = messageFromClient.toLowerCase();
@@ -344,6 +430,7 @@ class ClientHandler extends Thread{
                         done = true;
                         pr.println("ok bye");
 
+                        /*
                         // close input & output streams
                         pr.flush();
                         isr.close();
@@ -355,12 +442,15 @@ class ClientHandler extends Thread{
 
                         // kill thread
                         this.interrupt();
+                        */
+                        closeConnection();
                     }
                     else if(!isValidCommand(getCommand(input))){
                         responseToClient = "error protocol error";
                         pr.println("S: " + responseToClient);
                         pr.flush();
 
+                        /*
                         // close input & output streams
                         pr.flush();
                         isr.close();
@@ -372,6 +462,8 @@ class ClientHandler extends Thread{
 
                         // kill thread
                         this.interrupt();
+                        */
+                        closeConnection();
                     }
                     else{
                         responseToClient = checkClientInput(messageFromClient, dmtp, db);
@@ -387,9 +479,36 @@ class ClientHandler extends Thread{
             }
         } catch (IOException e) {
             //e.printStackTrace();
-            System.out.println("client disconnected");
+            System.out.println("IOException");
+            closeConnection();
         }
 
+    }
+
+    public void closeConnection(){
+        // close input & output streams
+        pr.flush();
+        try {
+            isr.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        try {
+            bfr.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        pr.close();
+
+        // close socket connection
+        try {
+            socket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        // kill thread
+        this.interrupt();
     }
 
     public String checkClientInput(String input, DMTPMessage dmtp, DMTPDatabse db){
