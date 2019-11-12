@@ -111,12 +111,7 @@ public class MailboxServer implements IMailboxServer, Runnable {
     public static void main(String[] args) throws Exception {
         IMailboxServer server = ComponentFactory.createMailboxServer(args[0], System.in, System.out);
         //server.run();
-
-        IMailboxServer server2 = ComponentFactory.createMailboxServer("mailbox-univer-ze", System.in, System.out);
-        //server2.run();
-
         new Thread(server::run).start();
-        //new Thread(server2::run).start();
     }
 }
 

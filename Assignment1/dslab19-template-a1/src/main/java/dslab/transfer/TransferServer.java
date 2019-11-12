@@ -124,9 +124,7 @@ public class TransferServer implements ITransferServer, Runnable {
     public static void main(String[] args) throws Exception {
         ITransferServer server = ComponentFactory.createTransferServer(args[0], System.in, System.out);
         //server.run();
-        ITransferServer server2 = ComponentFactory.createTransferServer("transfer-2", System.in, System.out);
         new Thread(server::run).start();
-        //new Thread(server2::run).start();
     }
 }
 
@@ -468,7 +466,7 @@ class ClientHandler extends Thread{
                         pr.flush();
 
                         closeConnection();
-                        
+
                     }
                     else if(!began && !getCommand(input).equals("begin")){
                         responseToClient = "No DMTP message initiated yet! Type 'begin' to initiate new DMTP Message.";
