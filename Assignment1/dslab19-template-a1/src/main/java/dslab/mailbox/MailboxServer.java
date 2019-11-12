@@ -118,7 +118,9 @@ public class MailboxServer implements IMailboxServer, Runnable {
 // Transfer Socket - DMTP
 class TransferSocketHandler extends Thread {
     private ServerSocket serverSocket;
+    private Socket socketClient;
     private DMTPDatabse db;
+    boolean isRunning;
 
     public TransferSocketHandler(int port, DMTPDatabse db, ServerSocket serverSocketDMTP){
         /*
@@ -135,10 +137,12 @@ class TransferSocketHandler extends Thread {
 
     @Override
     public void run(){
-        while(true){
+        isRunning = true;
+
+        while(isRunning){
             try {
                 //accept incoming request / get the socket from incoming device
-                Socket socketClient = serverSocket.accept();
+                socketClient = serverSocket.accept();
                 System.out.println("Transfer Server connected");
 
                 // create a new thread object to allow multiple clients
@@ -147,8 +151,12 @@ class TransferSocketHandler extends Thread {
                 // Invoking the start() method
                 transfer.start();
 
-            } catch (IOException e) {
-                e.printStackTrace();
+            }
+            catch (ConnectException e){
+                isRunning = false;
+            }catch (IOException e) {
+                isRunning = false;
+                //e.printStackTrace();
             }
         }
     }
@@ -348,7 +356,7 @@ class ClientSocketHandler extends Thread {
 
     @Override
     public void run(){
-        while(true){
+        while(!serverSocket.isClosed()){
             try {
                 //accept incoming request / get the socket from incoming device
                 Socket socketClient = serverSocket.accept();
@@ -361,7 +369,8 @@ class ClientSocketHandler extends Thread {
                 client.start();
 
             } catch (IOException e) {
-                e.printStackTrace();
+                System.out.println("Socket is closed");
+                //e.printStackTrace();
             }
         }
     }
