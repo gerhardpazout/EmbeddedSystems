@@ -71,7 +71,8 @@ public class MonitoringServer implements IMonitoringServer {
                     }
                     */
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    //e.printStackTrace();
+                    System.out.println("socket closed!");
                 }
             }
         }).start();
@@ -95,7 +96,10 @@ public class MonitoringServer implements IMonitoringServer {
     @Override
     @Command
     public void shutdown() {
-        socket.close();
+        running = false;
+        if (socket != null && !socket.isClosed()){
+            socket.close();
+        }
     }
 
     private void printBootUpMessage(){
