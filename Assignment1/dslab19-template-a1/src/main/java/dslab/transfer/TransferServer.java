@@ -49,9 +49,7 @@ public class TransferServer implements ITransferServer, Runnable {
         this.shell = new Shell(in, out);
         try {
             serverSocket = new ServerSocket(config.getInt("tcp.port"));
-            System.out.println("server socket created");
         } catch (IOException e) {
-            System.out.println("couldnt create server socket");
             e.printStackTrace();
         }
 
@@ -97,8 +95,6 @@ public class TransferServer implements ITransferServer, Runnable {
     @Command
     public void shutdown() {
         // TODO
-        System.out.println("shutting down socket");
-
         try {
             if(serverSocket != null && !serverSocket.isClosed()){
                 // close input & output streams
@@ -110,17 +106,18 @@ public class TransferServer implements ITransferServer, Runnable {
                 */
 
                 // close socket connection
+                System.out.println("shutting down socket...");
                 serverSocket.close();
-                System.out.println("socket closed!");
+                System.out.println("...socket closed!");
             }
             else {
-                System.out.println("socket not even opened!");
+                System.out.println("...socket not even opened!");
             }
         } catch (NullPointerException e){
-            System.out.println("NullpointerException - socket = null");
+            System.out.println("NullpointerException: shutdown()");
             e.printStackTrace();
         }catch (IOException e) {
-            System.out.println("Exception: shutdown()");
+            System.out.println("IOException: shutdown()");
             //e.printStackTrace();
         }
 
@@ -149,11 +146,9 @@ class MonitorHandler extends Thread {
     @Override
     public void run(){
         try {
-            System.out.println("trying to create monitoring server connection");
             socket = new DatagramSocket();
-            System.out.println("connection to monitoring server successful!");
         } catch (SocketException e) {
-            System.out.println("connection to monitoring server failed!");
+            System.out.println("SocketException: Monitoring server not available");
             e.printStackTrace();
         }
 
@@ -162,12 +157,15 @@ class MonitorHandler extends Thread {
             while( !data.isEmpty() ){
                 try {
                     DatagramPacket packet = data.take();
-                    System.out.println("sending packet...");
+                    //System.out.println("sending UDP packet to monitoring server...");
                     socket.send(packet);
+                    //System.out.println("...packet sent");
                 } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    System.out.println("InterruptedException: run()");
+                    //e.printStackTrace();
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    System.out.println("IOException: run()");
+                    //e.printStackTrace();
                 }
             }
         }
@@ -304,7 +302,6 @@ class MailboxSocketHandler extends Thread {
     }
 
     public void sendMessage(PrintWriter pr, String message){
-        System.out.println(message);
         pr.println(message);
         pr.flush();
     }
@@ -390,7 +387,7 @@ class ClientSocketHandler extends Thread {
                 client.start();
 
             } catch (ConnectException e){
-                System.out.println("ConnectException: Connection lost");
+                System.out.println("ConnectException: Connection lost!");
                 isRunning = false;
             } catch (IOException e) {
                 //e.printStackhTrace();
@@ -449,9 +446,6 @@ class ClientHandler extends Thread{
             DMTPMessage dmtp = new DMTPMessage();
 
             while (!serverSocket.isClosed() && isRunning && (messageFromClient = bfr.readLine()) != null) {
-                System.out.println("isRunning: " + isRunning);
-                System.out.println("socket.isClosed(): " + socket.isClosed());
-                System.out.println("serverSocket.isClosed(): " + serverSocket.isClosed());
 
                 if(!messageFromClient.isEmpty()){
 
@@ -498,7 +492,7 @@ class ClientHandler extends Thread{
                 pr.flush();
             }
         } catch(ConnectException e){
-            System.out.println("ConnectException - ?");
+            System.out.println("ConnectException - ClientHandler.run()");
             closeConnection();
 
         } catch (IOException e) {
@@ -557,14 +551,11 @@ class ClientHandler extends Thread{
                 break;
             case "to":
                 //get recipients;
-                //TODO: error unknown recipient ford
                 if(!isNullOrEmpty(context)){
 
                     boolean failed = false;
 
-                    System.out.println("checking recipient...");
                     for (String recipient : getRecipients(context)){
-                        System.out.println("checking recpient " + recipient + "...");
 
                         if (!failed){
                             if(!isEmail(recipient)){
@@ -610,7 +601,7 @@ class ClientHandler extends Thread{
                     try {
                         data.put(dmtp);
                         response = "ok";
-                        System.out.println("DMTP nachricht in Queue!");
+                        //System.out.println("DMTP nachricht in Queue!");
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
@@ -684,7 +675,6 @@ class ClientHandler extends Thread{
             return (users.getString(username) != null);
         }
         catch (java.util.MissingResourceException e){
-            System.out.println("EXCEPTION!");
             return false;
         }
     }
