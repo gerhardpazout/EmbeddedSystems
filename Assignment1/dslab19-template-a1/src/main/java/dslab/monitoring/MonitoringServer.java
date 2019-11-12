@@ -60,10 +60,16 @@ public class MonitoringServer implements IMonitoringServer {
                 try {
                     socket.receive(packet);
 
-                    String message = new String(buf, 0, packet.getLength());
-                    incrementHashMap(servers, getServerKeyFromMessage(message));
-                    incrementHashMap(addresses, getAddressKeyFromMessage(message));
-
+                    String message = new String(buf, 0, packet.getLength()).trim();
+                    if(messageIsValid(message)){
+                        incrementHashMap(servers, getServerKeyFromMessage(message));
+                        incrementHashMap(addresses, getAddressKeyFromMessage(message));
+                    }
+                    /*
+                    else{
+                        System.out.println("message '" + message + "' not in valid format");
+                    }
+                    */
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -101,6 +107,19 @@ public class MonitoringServer implements IMonitoringServer {
                         config.getInt("udp.port") +
                         "' in terminal app to connect"
         );
+    }
+
+    public boolean messageIsValid(String message){
+        String regexIP = "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\." +
+                "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\." +
+                "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\." +
+                "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)";
+        String regexColon = ":";
+        String regexPort = "(0|[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])";
+        String regexSpace = " ";
+        String regexEmail = "(.+)@(.+)";
+        String regex = "^" + regexIP + regexColon + regexPort + regexSpace + regexEmail + "$";
+        return message.matches(regex);
     }
 
     public void incrementHashMap(HashMap<String, Integer> map, String key){
