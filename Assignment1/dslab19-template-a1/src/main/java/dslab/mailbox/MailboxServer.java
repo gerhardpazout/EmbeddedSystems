@@ -207,19 +207,6 @@ class TransferHandler extends Thread {
                     done = true;
                     pr.println("ok bye");
 
-                    /*
-                    // close input & output streams
-                    pr.flush();
-                    isr.close();
-                    bfr.close();
-                    pr.close();
-
-                    // close socket connection
-                    socket.close();
-
-                    // kill thread
-                    this.interrupt();
-                    */
                     closeConnection();
                 }
                 else{
@@ -434,19 +421,6 @@ class ClientHandler extends Thread{
                         done = true;
                         pr.println("ok bye");
 
-                        /*
-                        // close input & output streams
-                        pr.flush();
-                        isr.close();
-                        bfr.close();
-                        pr.close();
-
-                        // close socket connection
-                        socket.close();
-
-                        // kill thread
-                        this.interrupt();
-                        */
                         closeConnection();
                     }
                     else if(!isValidCommand(getCommand(input))){
@@ -454,19 +428,6 @@ class ClientHandler extends Thread{
                         pr.println("S: " + responseToClient);
                         pr.flush();
 
-                        /*
-                        // close input & output streams
-                        pr.flush();
-                        isr.close();
-                        bfr.close();
-                        pr.close();
-
-                        // close socket connection
-                        socket.close();
-
-                        // kill thread
-                        this.interrupt();
-                        */
                         closeConnection();
                     }
                     else{
