@@ -526,7 +526,11 @@ class ClientHandler extends Thread{
                 else {
                     String user = getUserFromContext(context);
                     String password = getPasswordFromContext(context);
-                    if(!doesUserExist(user)){
+
+                    if(password == null){
+                        response = "error no password provided.";
+                    }
+                    else if(!doesUserExist(user)){
                         response = "error unknown user.";
                     }
                     else if(!checkUser(user, password)){
