@@ -10,6 +10,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
 import at.ac.tuwien.dsg.orvell.Shell;
+import at.ac.tuwien.dsg.orvell.StopShellException;
 import at.ac.tuwien.dsg.orvell.annotation.Command;
 import dslab.ComponentFactory;
 import dslab.util.Config;
@@ -27,6 +28,9 @@ public class TransferServer implements ITransferServer, Runnable {
     private ServerSocket serverSocket;
     private boolean running = true;
     private Shell shell;
+    private InputStreamReader isr;
+    private BufferedReader bfr;
+    private PrintWriter pr;
 
     /**
      * Creates a new server instance.
@@ -43,13 +47,25 @@ public class TransferServer implements ITransferServer, Runnable {
         this.in = in;
         this.out = out;
         this.shell = new Shell(in, out);
-        shell.register(this);
+        try {
+            serverSocket = new ServerSocket(config.getInt("tcp.port"));
+            System.out.println("server socket created");
+        } catch (IOException e) {
+            System.out.println("couldnt create server socket");
+            e.printStackTrace();
+        }
+
+        shell.register("shutdown", (input, context) -> {
+            shutdown();
+            throw new StopShellException();
+        });
     }
 
     @Override
     public void run() {
         // TODO
-        Thread clientSocketHandler = new ClientSocketHandler(config.getInt("tcp.port"), data, dataMonitor, serverSocket);
+
+        Thread clientSocketHandler = new ClientSocketHandler(config.getInt("tcp.port"), data, dataMonitor, serverSocket, isr, bfr, pr);
         Thread mailboxSocketHandler = new MailboxSocketHandler("localhost", 11482, data, dataMonitor, config, ip);
         Thread monitorSocketHandler = new MonitorHandler(config.getString("monitoring.host"), config.getInt("monitoring.port"), dataMonitor);
 
@@ -76,14 +92,33 @@ public class TransferServer implements ITransferServer, Runnable {
     @Command
     public void shutdown() {
         // TODO
-        System.out.println("shutting down connection");
-        /*
+        System.out.println("shutting down socket");
+
         try {
-            serverSocket.close();
-        } catch (IOException e) {
+            if(serverSocket != null && !serverSocket.isClosed()){
+                // close input & output streams
+                /*
+                pr.flush();
+                isr.close();
+                bfr.close();
+                pr.close();
+                */
+
+                // close socket connection
+                serverSocket.close();
+                System.out.println("socket closed!");
+            }
+            else {
+                System.out.println("socket not even opened!");
+            }
+        } catch (NullPointerException e){
+            System.out.println("NullpointerException - socket = null");
             e.printStackTrace();
+        }catch (IOException e) {
+            System.out.println("Exception: shutdown()");
+            //e.printStackTrace();
         }
-        */
+
     }
 
     public static void main(String[] args) throws Exception {
@@ -309,37 +344,54 @@ class ClientSocketHandler extends Thread {
     BlockingQueue<DMTPMessage> data;
     BlockingQueue dataMonitor;
     int port;
+    boolean isRunning;
+    private InputStreamReader isr;
+    private BufferedReader bfr;
+    private PrintWriter pr;
 
-    public ClientSocketHandler(int port, BlockingQueue<DMTPMessage> data, BlockingQueue dataMonitor, ServerSocket serverSocket){
+    Socket socketClient;
+
+    public ClientSocketHandler(int port, BlockingQueue<DMTPMessage> data, BlockingQueue dataMonitor, ServerSocket serverSocket, InputStreamReader isr, BufferedReader bfr, PrintWriter pr){
 
             this.serverSocket = serverSocket;
             this.data = data;
             this.dataMonitor = dataMonitor;
             this.port = port;
+            this.isr = isr;
+            this.bfr = bfr;
+            this.pr = pr;
 
     }
 
     @Override
     public void run(){
+        isRunning = true;
+        /*
         try {
             serverSocket = new ServerSocket(port);
         } catch (IOException e) {
             e.printStackTrace();
         }
-        while(true){
+        */
+        while(isRunning){
             try {
                 //accept incoming request / get the socket from incoming device
-                Socket socketClient = serverSocket.accept();
+                socketClient = serverSocket.accept();
                 System.out.println("client connected");
 
                 // create a new thread object to allow multiple clients
-                Thread client = new ClientHandler(socketClient, socketClient.getInputStream(), socketClient.getOutputStream(), data);
+                Thread client = new ClientHandler(serverSocket, socketClient, socketClient.getInputStream(), socketClient.getOutputStream(), data, isr, bfr, pr);
 
                 // Invoking the start() method
                 client.start();
 
+            } catch (ConnectException e){
+                System.out.println("ConnectException: Connection lost");
+                isRunning = false;
             } catch (IOException e) {
-                e.printStackTrace();
+                //e.printStackhTrace();
+                System.out.println("IOException: Socket closed!");
+                isRunning = false;
             }
         }
     }
@@ -350,37 +402,53 @@ class ClientHandler extends Thread{
     private ServerSocket serverSocket;
     private Socket socket;
     private BlockingQueue<DMTPMessage> data;
+    private InputStreamReader isr;
+    private BufferedReader bfr;
+    private PrintWriter pr;
+    private boolean isRunning;
 
     // Constructor
-    public ClientHandler(Socket socket, InputStream in, OutputStream out, BlockingQueue<DMTPMessage> data)
+    public ClientHandler(ServerSocket serverSocket, Socket socket, InputStream in, OutputStream out, BlockingQueue<DMTPMessage> data, InputStreamReader isr, BufferedReader bfr, PrintWriter pr)
     {
         this.socket = socket;
         this.in = in;
         this.out = out;
         this.data = data;
+        this.isr = isr;
+        this.bfr = bfr;
+        this.pr = pr;
+        this.serverSocket = serverSocket;
     }
 
     @Override
     public void run()
     {
         try {
+            isRunning = true;
+
             //Receiver message from incoming device
-            InputStreamReader isr = new InputStreamReader(socket.getInputStream());
-            BufferedReader bfr = new BufferedReader(isr);
+            //InputStreamReader isr = new InputStreamReader(socket.getInputStream());
+            //BufferedReader bfr = new BufferedReader(isr);
+            isr = new InputStreamReader(socket.getInputStream());
+            bfr = new BufferedReader(isr);
 
             //Send message to incoming device
-            PrintWriter pr = new PrintWriter(socket.getOutputStream());
+            pr = new PrintWriter(socket.getOutputStream());
 
             pr.println("S: Welcome! Type 'quit' to exit.");
             pr.flush();
 
-            boolean done = false;
+            //boolean done = false;
             boolean began = false;
             String messageFromClient;
             String responseToClient;
             DMTPMessage dmtp = new DMTPMessage();
 
-            while (!done && (messageFromClient = bfr.readLine()) != null) {
+            while (!serverSocket.isClosed() && isRunning && (messageFromClient = bfr.readLine()) != null) {
+                System.out.println("isRunning: " + isRunning);
+                System.out.println("socket.isClosed(): " + socket.isClosed());
+                System.out.println("serverSocket.isClosed(): " + serverSocket.isClosed());
+
                 if(!messageFromClient.isEmpty()){
 
                     messageFromClient = messageFromClient.toLowerCase();
@@ -389,9 +457,9 @@ class ClientHandler extends Thread{
                     String input = messageFromClient;
 
                     if(messageFromClient.toLowerCase().trim().equals("quit")){
-                        done = true;
                         pr.println("ok bye");
 
+                        /*
                         // close input & output streams
                         pr.flush();
                         isr.close();
@@ -400,6 +468,8 @@ class ClientHandler extends Thread{
 
                         // close socket connection
                         socket.close();
+                        */
+                        closeConnection();
 
                         // kill thread
                         this.interrupt();
@@ -409,6 +479,7 @@ class ClientHandler extends Thread{
                         pr.println("S: " + responseToClient);
                         pr.flush();
 
+                        /*
                         // close input & output streams
                         pr.flush();
                         isr.close();
@@ -417,6 +488,8 @@ class ClientHandler extends Thread{
 
                         // close socket connection
                         socket.close();
+                        */
+                        closeConnection();
 
                         // kill thread
                         this.interrupt();
@@ -445,11 +518,41 @@ class ClientHandler extends Thread{
                 pr.println("S: " + responseToClient);
                 pr.flush();
             }
+        } catch(ConnectException e){
+            System.out.println("ConnectException - ?");
+            closeConnection();
+
         } catch (IOException e) {
             //e.printStackTrace();
-            System.out.println("client disconnected");
+            System.out.println("IOException - client disconnected");
+            closeConnection();
         }
 
+    }
+
+    public void closeConnection(){
+        // close input & output streams
+        isRunning = false;
+
+        pr.flush();
+        try {
+            isr.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        try {
+            bfr.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        pr.close();
+        // close socket connection
+        try {
+            socket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        this.interrupt();
     }
 
     public String checkClientInput(String input, DMTPMessage dmtp){
