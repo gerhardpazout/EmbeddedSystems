@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.concurrent.BlockingQueue;
 
 import at.ac.tuwien.dsg.orvell.Shell;
+import at.ac.tuwien.dsg.orvell.annotation.Command;
 import dslab.ComponentFactory;
 import dslab.monitoring.DMTPDatabaseMessage;
 import dslab.monitoring.DMTPDatabse;
@@ -26,6 +27,7 @@ public class MailboxServer implements IMailboxServer, Runnable {
     private OutputStream out;
     private Socket transferSocket;
     private DMTPDatabse db;
+    private Shell shell;
 
     /**
      * Creates a new server instance.
@@ -42,6 +44,11 @@ public class MailboxServer implements IMailboxServer, Runnable {
         this.in = in;
         this.out = out;
         this.db = new DMTPDatabse();
+
+        shell = new Shell(in, out);
+        shell.register(this);
+
+        run();
     }
 
     private void printBootUpMessage(){
@@ -86,9 +93,13 @@ public class MailboxServer implements IMailboxServer, Runnable {
         client.start();
 
         printBootUpMessage();
+
+        //new Thread(()->shell.run()).start();
+        shell.run();
     }
 
     @Override
+    @Command
     public void shutdown() {
         //close DMTP
         if(serverSocketDMTP != null && !serverSocketDMTP.isClosed()){
@@ -111,14 +122,16 @@ public class MailboxServer implements IMailboxServer, Runnable {
     public static void main(String[] args) throws Exception {
         IMailboxServer server = ComponentFactory.createMailboxServer(args[0], System.in, System.out);
         //server.run();
-        new Thread(server::run).start();
+        //new Thread(server::run).start();
     }
 }
 
 // Transfer Socket - DMTP
 class TransferSocketHandler extends Thread {
     private ServerSocket serverSocket;
+    private Socket socketClient;
     private DMTPDatabse db;
+    boolean isRunning;
 
     public TransferSocketHandler(int port, DMTPDatabse db, ServerSocket serverSocketDMTP){
         /*
@@ -135,10 +148,12 @@ class TransferSocketHandler extends Thread {
 
     @Override
     public void run(){
-        while(true){
+        isRunning = true;
+
+        while(isRunning){
             try {
                 //accept incoming request / get the socket from incoming device
-                Socket socketClient = serverSocket.accept();
+                socketClient = serverSocket.accept();
                 System.out.println("Transfer Server connected");
 
                 // create a new thread object to allow multiple clients
@@ -147,8 +162,12 @@ class TransferSocketHandler extends Thread {
                 // Invoking the start() method
                 transfer.start();
 
-            } catch (IOException e) {
-                e.printStackTrace();
+            }
+            catch (ConnectException e){
+                isRunning = false;
+            }catch (IOException e) {
+                isRunning = false;
+                //e.printStackTrace();
             }
         }
     }
@@ -199,19 +218,6 @@ class TransferHandler extends Thread {
                     done = true;
                     pr.println("ok bye");
 
-                    /*
-                    // close input & output streams
-                    pr.flush();
-                    isr.close();
-                    bfr.close();
-                    pr.close();
-
-                    // close socket connection
-                    socket.close();
-
-                    // kill thread
-                    this.interrupt();
-                    */
                     closeConnection();
                 }
                 else{
@@ -348,7 +354,7 @@ class ClientSocketHandler extends Thread {
 
     @Override
     public void run(){
-        while(true){
+        while(!serverSocket.isClosed()){
             try {
                 //accept incoming request / get the socket from incoming device
                 Socket socketClient = serverSocket.accept();
@@ -361,7 +367,8 @@ class ClientSocketHandler extends Thread {
                 client.start();
 
             } catch (IOException e) {
-                e.printStackTrace();
+                System.out.println("Socket is closed");
+                //e.printStackTrace();
             }
         }
     }
@@ -425,19 +432,6 @@ class ClientHandler extends Thread{
                         done = true;
                         pr.println("ok bye");
 
-                        /*
-                        // close input & output streams
-                        pr.flush();
-                        isr.close();
-                        bfr.close();
-                        pr.close();
-
-                        // close socket connection
-                        socket.close();
-
-                        // kill thread
-                        this.interrupt();
-                        */
                         closeConnection();
                     }
                     else if(!isValidCommand(getCommand(input))){
@@ -445,19 +439,6 @@ class ClientHandler extends Thread{
                         pr.println("S: " + responseToClient);
                         pr.flush();
 
-                        /*
-                        // close input & output streams
-                        pr.flush();
-                        isr.close();
-                        bfr.close();
-                        pr.close();
-
-                        // close socket connection
-                        socket.close();
-
-                        // kill thread
-                        this.interrupt();
-                        */
                         closeConnection();
                     }
                     else{
@@ -526,7 +507,11 @@ class ClientHandler extends Thread{
                 else {
                     String user = getUserFromContext(context);
                     String password = getPasswordFromContext(context);
-                    if(!doesUserExist(user)){
+
+                    if(password == null){
+                        response = "error no password provided.";
+                    }
+                    else if(!doesUserExist(user)){
                         response = "error unknown user.";
                     }
                     else if(!checkUser(user, password)){

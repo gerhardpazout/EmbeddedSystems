@@ -36,6 +36,8 @@ public class MonitoringServer implements IMonitoringServer {
 
         shell = new Shell(in, out);
         shell.register(this);
+
+        run();
     }
 
     @Override
@@ -60,18 +62,26 @@ public class MonitoringServer implements IMonitoringServer {
                 try {
                     socket.receive(packet);
 
-                    String message = new String(buf, 0, packet.getLength());
-                    incrementHashMap(servers, getServerKeyFromMessage(message));
-                    incrementHashMap(addresses, getAddressKeyFromMessage(message));
-
+                    String message = new String(buf, 0, packet.getLength()).trim();
+                    if(messageIsValid(message)){
+                        incrementHashMap(servers, getServerKeyFromMessage(message));
+                        incrementHashMap(addresses, getAddressKeyFromMessage(message));
+                    }
+                    /*
+                    else{
+                        System.out.println("message '" + message + "' not in valid format");
+                    }
+                    */
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    //e.printStackTrace();
+                    System.out.println("socket closed!");
                 }
             }
         }).start();
 
         //start shell
-        new Thread(() -> shell.run()).start();
+        //new Thread(() -> shell.run()).start();
+        shell.run();
     }
 
     @Override
@@ -89,7 +99,10 @@ public class MonitoringServer implements IMonitoringServer {
     @Override
     @Command
     public void shutdown() {
-        socket.close();
+        running = false;
+        if (socket != null && !socket.isClosed()){
+            socket.close();
+        }
     }
 
     private void printBootUpMessage(){
@@ -101,6 +114,19 @@ public class MonitoringServer implements IMonitoringServer {
                         config.getInt("udp.port") +
                         "' in terminal app to connect"
         );
+    }
+
+    public boolean messageIsValid(String message){
+        String regexIP = "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\." +
+                "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\." +
+                "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\." +
+                "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)";
+        String regexColon = ":";
+        String regexPort = "(0|[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])";
+        String regexSpace = " ";
+        String regexEmail = "(.+)@(.+)";
+        String regex = "^" + regexIP + regexColon + regexPort + regexSpace + regexEmail + "$";
+        return message.matches(regex);
     }
 
     public void incrementHashMap(HashMap<String, Integer> map, String key){
@@ -121,7 +147,7 @@ public class MonitoringServer implements IMonitoringServer {
     }
 
     public String getServerKeyFromMessage(String message){
-        return getAddressFromMessage(getAddressFromMessage(message) + ":" + getPortFromMessage(message));
+        return getAddressFromMessage(message) + ":" + getPortFromMessage(message);
     }
 
     public String getAddressKeyFromMessage(String message){
@@ -130,7 +156,7 @@ public class MonitoringServer implements IMonitoringServer {
 
     public static void main(String[] args) throws Exception {
         IMonitoringServer server = ComponentFactory.createMonitoringServer(args[0], System.in, System.out);
-        server.run();
+        //server.run();
     }
 
 }
