@@ -53,14 +53,10 @@ public class TransferServer implements ITransferServer, Runnable {
             e.printStackTrace();
         }
 
-        /*
         shell.register("shutdown", (input, context) -> {
             shutdown();
             throw new StopShellException();
         });
-        */
-        shell.register(this);
-        run();
     }
 
     @Override
@@ -76,7 +72,6 @@ public class TransferServer implements ITransferServer, Runnable {
         monitorSocketHandler.start();
         printBootUpMessage();
 
-        //new Thread(() -> shell.run()).start();
         shell.run();
     }
 
@@ -97,13 +92,6 @@ public class TransferServer implements ITransferServer, Runnable {
         // TODO
         try {
             if(serverSocket != null && !serverSocket.isClosed()){
-                // close input & output streams
-                /*
-                pr.flush();
-                isr.close();
-                bfr.close();
-                pr.close();
-                */
 
                 // close socket connection
                 System.out.println("shutting down socket...");
@@ -120,12 +108,15 @@ public class TransferServer implements ITransferServer, Runnable {
             System.out.println("IOException: shutdown()");
             //e.printStackTrace();
         }
-
+        /*
+        Thread.currentThread().interrupt();
+        Runtime.getRuntime().exit(0);
+        */
     }
 
     public static void main(String[] args) throws Exception {
         ITransferServer server = ComponentFactory.createTransferServer(args[0], System.in, System.out);
-        //server.run();
+        server.run();
         //new Thread(server::run).start();
     }
 }
@@ -136,6 +127,7 @@ class MonitorHandler extends Thread {
     private int port;
     private DatagramSocket socket;
     private BlockingQueue<DatagramPacket> data;
+    private boolean isRunning = false;
 
     public MonitorHandler(String host, int port, BlockingQueue<DatagramPacket> data){
         this.host = host;
@@ -152,8 +144,10 @@ class MonitorHandler extends Thread {
             e.printStackTrace();
         }
 
+        isRunning = true;
+
         //if there is data => send data to monitoring server
-        while (true){
+        while (isRunning){
             while( !data.isEmpty() ){
                 try {
                     DatagramPacket packet = data.take();
@@ -162,10 +156,16 @@ class MonitorHandler extends Thread {
                     //System.out.println("...packet sent");
                 } catch (InterruptedException e) {
                     System.out.println("InterruptedException: run()");
+
                     //e.printStackTrace();
                 } catch (IOException e) {
                     System.out.println("IOException: run()");
                     //e.printStackTrace();
+                } finally {
+                    isRunning = false;
+                    if(socket != null && !socket.isClosed()){
+                        socket.close();
+                    }
                 }
             }
         }
@@ -186,6 +186,8 @@ class MailboxSocketHandler extends Thread {
 
     private Config domains = new Config("domains.properties");
 
+    private boolean isRunning = false;
+
     // Constructor
     public MailboxSocketHandler(String host, int port, BlockingQueue<DMTPMessage> data, BlockingQueue dataMonitor, Config configTransfer, String ipTransfer) {
         this.host = host;
@@ -200,7 +202,8 @@ class MailboxSocketHandler extends Thread {
     @Override
     public void run()
     {
-        while (true){
+        isRunning = true;
+        while (isRunning){
             DMTPMessage dmtp;
             while( !data.isEmpty() ){
 
@@ -213,6 +216,7 @@ class MailboxSocketHandler extends Thread {
 
                 } catch (InterruptedException e) {
                     e.printStackTrace();
+                    isRunning = false;
                 }
             }
 
@@ -220,6 +224,7 @@ class MailboxSocketHandler extends Thread {
                 Thread.sleep(1000);
             } catch (InterruptedException e) {
                 e.printStackTrace();
+                isRunning = false;
             }
         }
     }
@@ -389,12 +394,26 @@ class ClientSocketHandler extends Thread {
             } catch (ConnectException e){
                 System.out.println("ConnectException: Connection lost!");
                 isRunning = false;
+                closeConnection();
             } catch (IOException e) {
                 //e.printStackhTrace();
                 System.out.println("IOException: Socket closed!");
                 isRunning = false;
+                closeConnection();
             }
         }
+    }
+
+    public void closeConnection(){
+        if(socketClient != null && !socketClient.isClosed()){
+            try {
+                socketClient.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        this.interrupt();
+
     }
 }
 class ClientHandler extends Thread{

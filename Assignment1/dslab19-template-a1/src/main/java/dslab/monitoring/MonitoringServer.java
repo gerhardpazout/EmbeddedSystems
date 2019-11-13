@@ -7,6 +7,7 @@ import java.net.*;
 import java.util.HashMap;
 
 import at.ac.tuwien.dsg.orvell.Shell;
+import at.ac.tuwien.dsg.orvell.StopShellException;
 import at.ac.tuwien.dsg.orvell.annotation.Command;
 import dslab.ComponentFactory;
 import dslab.util.Config;
@@ -35,9 +36,10 @@ public class MonitoringServer implements IMonitoringServer {
         this.config = config;
 
         shell = new Shell(in, out);
-        shell.register(this);
-
-        run();
+        shell.register("shutdown", (input, context) -> {
+            shutdown();
+            throw new StopShellException();
+        });
     }
 
     @Override
@@ -79,8 +81,6 @@ public class MonitoringServer implements IMonitoringServer {
             }
         }).start();
 
-        //start shell
-        //new Thread(() -> shell.run()).start();
         shell.run();
     }
 

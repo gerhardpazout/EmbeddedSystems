@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.concurrent.BlockingQueue;
 
 import at.ac.tuwien.dsg.orvell.Shell;
+import at.ac.tuwien.dsg.orvell.StopShellException;
 import at.ac.tuwien.dsg.orvell.annotation.Command;
 import dslab.ComponentFactory;
 import dslab.monitoring.DMTPDatabaseMessage;
@@ -46,9 +47,11 @@ public class MailboxServer implements IMailboxServer, Runnable {
         this.db = new DMTPDatabse();
 
         shell = new Shell(in, out);
-        shell.register(this);
+        shell.register("shutdown", (input, context) -> {
+            shutdown();
+            throw new StopShellException();
+        });
 
-        run();
     }
 
     private void printBootUpMessage(){
@@ -94,7 +97,6 @@ public class MailboxServer implements IMailboxServer, Runnable {
 
         printBootUpMessage();
 
-        //new Thread(()->shell.run()).start();
         shell.run();
     }
 
