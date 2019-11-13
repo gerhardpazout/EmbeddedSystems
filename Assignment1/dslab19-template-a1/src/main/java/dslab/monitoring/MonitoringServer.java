@@ -5,6 +5,8 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.net.*;
 import java.util.HashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import at.ac.tuwien.dsg.orvell.Shell;
 import at.ac.tuwien.dsg.orvell.StopShellException;
@@ -22,7 +24,7 @@ public class MonitoringServer implements IMonitoringServer {
     private DatagramSocket socket;
     private boolean running;
 
-
+    ExecutorService pool;
     /**
      * Creates a new server instance.
      *
@@ -36,14 +38,27 @@ public class MonitoringServer implements IMonitoringServer {
         this.config = config;
 
         shell = new Shell(in, out);
+
         shell.register("shutdown", (input, context) -> {
             shutdown();
             throw new StopShellException();
         });
+        shell.register("addresses", (input, context) -> {
+            addresses();
+            throw new StopShellException();
+        });
+        shell.register("servers", (input, context) -> {
+            servers();
+            throw new StopShellException();
+        });
+
+        //shell.register(this);
     }
 
     @Override
     public void run() {
+        pool = Executors.newFixedThreadPool(20);
+
         //start connection
         try {
             socket = new DatagramSocket(config.getInt("udp.port"));
@@ -53,6 +68,7 @@ public class MonitoringServer implements IMonitoringServer {
         }
 
         //start receiving udp packets
+        pool.execute(
         new Thread(() -> {
             running = true;
             byte[] buf;
@@ -79,9 +95,10 @@ public class MonitoringServer implements IMonitoringServer {
                     System.out.println("socket closed!");
                 }
             }
-        }).start();
+        })
+        );
 
-        shell.run();
+        pool.execute(shell);
     }
 
     @Override
@@ -103,6 +120,7 @@ public class MonitoringServer implements IMonitoringServer {
         if (socket != null && !socket.isClosed()){
             socket.close();
         }
+        pool.shutdownNow();
     }
 
     private void printBootUpMessage(){
@@ -156,7 +174,7 @@ public class MonitoringServer implements IMonitoringServer {
 
     public static void main(String[] args) throws Exception {
         IMonitoringServer server = ComponentFactory.createMonitoringServer(args[0], System.in, System.out);
-        //server.run();
+        server.run();
     }
 
 }

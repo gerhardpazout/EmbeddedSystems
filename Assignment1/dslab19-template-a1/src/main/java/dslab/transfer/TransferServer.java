@@ -75,6 +75,8 @@ public class TransferServer implements ITransferServer, Runnable {
 
         shell.run();
         */
+        printBootUpMessage();
+
         pool = Executors.newFixedThreadPool(20);
 
         //Executors pool = Executors.newFixedThreadPool(20);
@@ -85,6 +87,8 @@ public class TransferServer implements ITransferServer, Runnable {
             pool.execute(new MonitoringConnection(config.getString("monitoring.host"), config.getInt("monitoring.port"), dataMonitor));
             pool.execute(shell);
         //}
+
+
     }
 
     private void printBootUpMessage(){
