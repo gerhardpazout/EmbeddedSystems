@@ -6,6 +6,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import at.ac.tuwien.dsg.orvell.Shell;
 import at.ac.tuwien.dsg.orvell.StopShellException;
@@ -13,6 +15,9 @@ import at.ac.tuwien.dsg.orvell.annotation.Command;
 import dslab.ComponentFactory;
 import dslab.monitoring.DMTPDatabaseMessage;
 import dslab.monitoring.DMTPDatabse;
+import dslab.transfer.ClientConnectionHandler;
+import dslab.transfer.MailboxConnection;
+import dslab.transfer.MonitoringConnection;
 import dslab.util.CommandLine;
 import dslab.util.Config;
 import dslab.util.DMTPMessage;
@@ -29,6 +34,7 @@ public class MailboxServer implements IMailboxServer, Runnable {
     private Socket transferSocket;
     private DMTPDatabse db;
     private Shell shell;
+    ExecutorService pool;
 
     /**
      * Creates a new server instance.
@@ -88,15 +94,12 @@ public class MailboxServer implements IMailboxServer, Runnable {
             e.printStackTrace();
         }
 
-        Thread transferThread = new TransferConnection(config.getInt("dmtp.tcp.port"), db, serverSocketDMTP);
-        transferThread.start();
-
-        Thread client = new ClientConnection(config.getInt("dmap.tcp.port"), db, componentId, serverSocketDMAP);
-        client.start();
-
         printBootUpMessage();
 
-        shell.run();
+        pool = Executors.newFixedThreadPool(20);
+        pool.execute(new TransferConnection(config.getInt("dmtp.tcp.port"), db, serverSocketDMTP));
+        pool.execute(new ClientConnection(config.getInt("dmap.tcp.port"), db, componentId, serverSocketDMAP));
+        pool.execute(shell);
     }
 
     @Override
@@ -118,11 +121,11 @@ public class MailboxServer implements IMailboxServer, Runnable {
                 e.printStackTrace();
             }
         }
+        pool.shutdownNow();
     }
 
     public static void main(String[] args) throws Exception {
         IMailboxServer server = ComponentFactory.createMailboxServer(args[0], System.in, System.out);
         server.run();
-        //new Thread(server::run).start();
     }
 }
