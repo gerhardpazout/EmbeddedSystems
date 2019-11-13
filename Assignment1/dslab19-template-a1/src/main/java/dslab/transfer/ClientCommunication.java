@@ -93,8 +93,8 @@ public class ClientCommunication extends Thread {
                     }
                     else{
                         responseToClient = checkClientInput(messageFromClient, dmtp);
-                        pr.println(responseToClient);
-                        pr.flush();
+                        //pr.println(responseToClient);
+                        //pr.flush();
                     }
                 }
                 else {
