@@ -39,7 +39,7 @@ public class ClientConnectionHandler extends Thread {
     public void run(){
         isRunning = true;
 
-        while(isRunning){
+        while(serverSocket != null && !serverSocket.isClosed()){
             try {
                 //accept incoming request / get the socket from incoming device
                 socketClient = serverSocket.accept();
@@ -53,12 +53,12 @@ public class ClientConnectionHandler extends Thread {
 
             } catch (ConnectException e){
                 System.out.println("ConnectException: Connection lost!");
-                isRunning = false;
+                //isRunning = false;
                 closeConnection();
             } catch (IOException e) {
                 //e.printStackhTrace();
                 System.out.println("IOException: Socket closed!");
-                isRunning = false;
+                //isRunning = false;
                 closeConnection();
             }
         }
@@ -73,6 +73,5 @@ public class ClientConnectionHandler extends Thread {
             }
         }
         this.interrupt();
-
     }
 }

@@ -6,8 +6,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.*;
 
 import at.ac.tuwien.dsg.orvell.Shell;
 import at.ac.tuwien.dsg.orvell.StopShellException;
@@ -31,6 +30,7 @@ public class TransferServer implements ITransferServer, Runnable {
     private InputStreamReader isr;
     private BufferedReader bfr;
     private PrintWriter pr;
+    ExecutorService pool;
 
     /**
      * Creates a new server instance.
@@ -63,6 +63,7 @@ public class TransferServer implements ITransferServer, Runnable {
     public void run() {
         // TODO
 
+        /*
         Thread clientSocketHandler = new ClientConnectionHandler(config.getInt("tcp.port"), data, dataMonitor, serverSocket, isr, bfr, pr);
         Thread mailboxSocketHandler = new MailboxConnection("localhost", 11482, data, dataMonitor, config, ip);
         Thread monitorSocketHandler = new MonitoringConnection(config.getString("monitoring.host"), config.getInt("monitoring.port"), dataMonitor);
@@ -73,6 +74,17 @@ public class TransferServer implements ITransferServer, Runnable {
         printBootUpMessage();
 
         shell.run();
+        */
+        pool = Executors.newFixedThreadPool(20);
+
+        //Executors pool = Executors.newFixedThreadPool(20);
+
+        //while (true) {
+            pool.execute(new ClientConnectionHandler(config.getInt("tcp.port"), data, dataMonitor, serverSocket, isr, bfr, pr));
+            pool.execute(new MailboxConnection("localhost", 11482, data, dataMonitor, config, ip));
+            pool.execute(new MonitoringConnection(config.getString("monitoring.host"), config.getInt("monitoring.port"), dataMonitor));
+            pool.execute(shell);
+        //}
     }
 
     private void printBootUpMessage(){
@@ -108,10 +120,7 @@ public class TransferServer implements ITransferServer, Runnable {
             System.out.println("IOException: shutdown()");
             //e.printStackTrace();
         }
-        /*
-        Thread.currentThread().interrupt();
-        Runtime.getRuntime().exit(0);
-        */
+        pool.shutdownNow();
     }
 
     public static void main(String[] args) throws Exception {
