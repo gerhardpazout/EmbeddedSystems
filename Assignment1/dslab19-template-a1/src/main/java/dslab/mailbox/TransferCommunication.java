@@ -12,21 +12,16 @@ import java.util.ArrayList;
 public class TransferCommunication extends Thread {
     private ServerSocket serverSocket;
     private Socket socket;
-    private InputStream in;
-    private OutputStream out;
     private DMTPDatabse db;
 
-    InputStreamReader isr;
-    BufferedReader bfr;
-    PrintWriter pr;
+    //Input and output
+    private InputStreamReader isr;
+    private BufferedReader bfr;
+    private PrintWriter pr;
 
-
-
-    public TransferCommunication(ServerSocket serverSocket, Socket socket, InputStream in, OutputStream out, DMTPDatabse db){
+    public TransferCommunication(ServerSocket serverSocket, Socket socket, DMTPDatabse db){
         this.serverSocket = serverSocket;
         this.socket = socket;
-        this.in = in;
-        this.out = out;
         this.db = db;
     }
 
@@ -40,15 +35,10 @@ public class TransferCommunication extends Thread {
             //Send message to incoming device
             pr = new PrintWriter(socket.getOutputStream());
 
-            pr.println("You are connected to the mailbox server");
-            pr.flush();
-
             boolean done = false;
             String response;
             DMTPMessage dmtp = new DMTPMessage();
             while (!serverSocket.isClosed() && !done && (response = bfr.readLine()) != null) {
-
-                System.out.println("response: " + response);
 
                 if(response.toLowerCase().trim().equals("quit")){
                     done = true;
@@ -64,13 +54,6 @@ public class TransferCommunication extends Thread {
                     if( dmtp.isValid() && getCommand(response).equals("data")){
                         db.addMessage(dmtp);
                     }
-
-                    System.out.println("\nlist:");
-                    //System.out.println(db.showMessages());
-                    System.out.println();
-
-                    pr.println(response);
-
                 }
                 pr.flush();
             }

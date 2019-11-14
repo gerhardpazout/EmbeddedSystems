@@ -11,8 +11,6 @@ import java.net.Socket;
 import java.util.ArrayList;
 
 public class ClientCommunication extends Thread {
-    private InputStream in;
-    private OutputStream out;
     private ServerSocket serverSocket;
     private Socket socket;
     private DMTPDatabse db;
@@ -26,12 +24,10 @@ public class ClientCommunication extends Thread {
     PrintWriter pr;
 
     // Constructor
-    public ClientCommunication(ServerSocket serverSocket, Socket socket, InputStream in, OutputStream out, DMTPDatabse db, String componentId)
+    public ClientCommunication(String componentId, ServerSocket serverSocket, Socket socket, DMTPDatabse db)
     {
         this.serverSocket = serverSocket;
         this.socket = socket;
-        this.in = in;
-        this.out = out;
         this.db = db;
         this.componentId = componentId;
         users = new Config("users-" + componentId.replace("mailbox-", "") + ".properties");
@@ -95,7 +91,7 @@ public class ClientCommunication extends Thread {
 
     }
 
-    public void closeConnection(){
+    private void closeConnection(){
         // close input & output streams
         pr.flush();
         try {
@@ -121,7 +117,7 @@ public class ClientCommunication extends Thread {
         this.interrupt();
     }
 
-    public String checkClientInput(String input, DMTPMessage dmtp, DMTPDatabse db){
+    private String checkClientInput(String input, DMTPMessage dmtp, DMTPDatabse db){
         String response = "ok";
         String command = getCommand(input);
         String context = getContext(input);
@@ -173,7 +169,7 @@ public class ClientCommunication extends Thread {
                 break;
             case "show":
                 if(isLoggedIn){
-                    response = "error unknown message id.";
+                    //response = "error unknown message id.";
 
                     if(isNullOrEmpty(context)){
                         response = "error command missing parameter.";
@@ -185,9 +181,8 @@ public class ClientCommunication extends Thread {
                             System.out.println("LIST EMPTY");
                             response = "no messages.";
                         }
-                        else if(db.showMessage(id, getEmailFromUser(this.user)) == null) {
-                            System.out.println("NO MESSAGES FOUND");
-                            response = "no messages.";
+                        else if(db.getMessageById(id) == null){
+                            response = "error unknown message id.";
                         }
                         else {
                             response = db.showMessage(id, getEmailFromUser(this.user));
@@ -229,13 +224,11 @@ public class ClientCommunication extends Thread {
         return response;
     }
 
-    public String getCommand(String input){
+    private String getCommand(String input){
         return (input.split(" ").length >= 1)? input.split(" ")[0] : input;
     }
 
-    public String getContext(String input){
-        //return ((input.split(" ").length >= 2))? input.substring(input.indexOf(" ")).trim() : null;
-
+    private String getContext(String input){
         if(input.split(" ").length < 2){
             return null;
         }
@@ -247,13 +240,11 @@ public class ClientCommunication extends Thread {
         return context.split(regex);
     }
 
-    public static boolean isNullOrEmpty(String str) {
-        if(str != null && !str.isEmpty())
-            return false;
-        return true;
+    private static boolean isNullOrEmpty(String str) {
+        return str == null || str.isEmpty();
     }
 
-    public boolean isValidCommand(String command){
+    private boolean isValidCommand(String command){
         boolean isValid = false;
         String[] validCommands = {"login", "list", "show", "delete", "logout"};
 
@@ -264,13 +255,13 @@ public class ClientCommunication extends Thread {
         return isValid;
     }
 
-    public String getIdFromContext(String context){
+    private String getIdFromContext(String context){
         context = context.trim();
         String regex = "^[0-9]+$";
         return (context.matches(regex))? context : null;
     }
 
-    public String getUserFromContext(String context){
+    private String getUserFromContext(String context){
         if (context.split(" ").length < 2){
             return null;
         }
@@ -279,7 +270,7 @@ public class ClientCommunication extends Thread {
         }
     }
 
-    public String getPasswordFromContext(String context){
+    private String getPasswordFromContext(String context){
         if (context.split(" ").length < 2){
             return null;
         }
@@ -288,11 +279,11 @@ public class ClientCommunication extends Thread {
         }
     }
 
-    public boolean doesUserExist(String user){
+    private boolean doesUserExist(String user){
         return users.containsKey(user);
     }
 
-    public boolean checkUser(String user, String password){
+    private boolean checkUser(String user, String password){
         try{
             return (users.getString(user).equals(password));
         }
@@ -301,11 +292,11 @@ public class ClientCommunication extends Thread {
         }
     }
 
-    public String getDomainFromComponentId(){
+    private String getDomainFromComponentId(){
         return componentId.replace("mailbox-", "").replace("-", ".");
     }
 
-    public String getEmailFromUser(String username){
+    private String getEmailFromUser(String username){
         System.out.println("EMAIL: " +  username + "@" + getDomainFromComponentId());
         return username + "@" + getDomainFromComponentId();
     }

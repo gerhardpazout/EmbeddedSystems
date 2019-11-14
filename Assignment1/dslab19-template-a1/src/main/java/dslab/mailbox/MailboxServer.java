@@ -28,10 +28,8 @@ public class MailboxServer implements IMailboxServer, Runnable {
     private Config config;
     private ServerSocket serverSocketDMTP;
     private ServerSocket serverSocketDMAP;
-    private CommandLine shellClient;
     private InputStream in;
     private OutputStream out;
-    private Socket transferSocket;
     private DMTPDatabse db;
     private Shell shell;
     ExecutorService pool;
@@ -73,14 +71,6 @@ public class MailboxServer implements IMailboxServer, Runnable {
         System.out.println(componentId + " logs:");
     }
 
-    public ServerSocket getServerSocketDMTP() {
-        return serverSocketDMTP;
-    }
-
-    public ServerSocket getServerSocketDMAP(){
-        return serverSocketDMAP;
-    }
-
     @Override
     public void run() {
         try {
@@ -97,8 +87,8 @@ public class MailboxServer implements IMailboxServer, Runnable {
         printBootUpMessage();
 
         pool = Executors.newFixedThreadPool(20);
-        pool.execute(new TransferConnection(config.getInt("dmtp.tcp.port"), db, serverSocketDMTP));
-        pool.execute(new ClientConnection(config.getInt("dmap.tcp.port"), db, componentId, serverSocketDMAP));
+        pool.execute(new TransferConnection(config, serverSocketDMTP, db));
+        pool.execute(new ClientConnection(componentId, serverSocketDMAP, db));
         pool.execute(shell);
     }
 
