@@ -65,33 +65,33 @@ public class MonitoringServer implements IMonitoringServer {
 
         //start receiving udp packets
         pool.execute(
-        new Thread(() -> {
-            running = true;
-            byte[] buf;
+            new Thread(() -> {
+                running = true;
+                byte[] buf;
 
-            while (socket != null && !socket.isClosed()) {
-                buf = new byte[1024];
-                DatagramPacket packet = new DatagramPacket(buf, buf.length);
+                while (socket != null && !socket.isClosed()) {
+                    buf = new byte[1024];
+                    DatagramPacket packet = new DatagramPacket(buf, buf.length);
 
-                try {
-                    socket.receive(packet);
+                    try {
+                        socket.receive(packet);
 
-                    String message = new String(buf, 0, packet.getLength()).trim();
-                    if(messageIsValid(message)){
-                        incrementHashMap(servers, getServerKeyFromMessage(message));
-                        incrementHashMap(addresses, getAddressKeyFromMessage(message));
+                        String message = new String(buf, 0, packet.getLength()).trim();
+                        if(messageIsValid(message)){
+                            incrementHashMap(servers, getServerKeyFromMessage(message));
+                            incrementHashMap(addresses, getAddressKeyFromMessage(message));
+                        }
+                        /*
+                        else{
+                            System.out.println("message '" + message + "' not in valid format");
+                        }
+                        */
+                    } catch (IOException e) {
+                        //e.printStackTrace();
+                        System.out.println("socket closed!");
                     }
-                    /*
-                    else{
-                        System.out.println("message '" + message + "' not in valid format");
-                    }
-                    */
-                } catch (IOException e) {
-                    //e.printStackTrace();
-                    System.out.println("socket closed!");
                 }
-            }
-        })
+            })
         );
 
         pool.execute(shell);
