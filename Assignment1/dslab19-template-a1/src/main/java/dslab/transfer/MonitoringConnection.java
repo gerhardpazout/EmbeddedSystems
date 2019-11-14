@@ -8,15 +8,11 @@ import java.net.SocketException;
 import java.util.concurrent.BlockingQueue;
 
 public class MonitoringConnection extends Thread {
-    private String host;
-    private int port;
     private DatagramSocket socket;
     private BlockingQueue<DatagramPacket> data;
     private ServerSocket serverSocket;
 
-    public MonitoringConnection(String host, int port, BlockingQueue<DatagramPacket> data, ServerSocket serverSocket){
-        this.host = host;
-        this.port = port;
+    public MonitoringConnection(BlockingQueue<DatagramPacket> data, ServerSocket serverSocket){
         this.data = data;
         this.serverSocket = serverSocket;
     }

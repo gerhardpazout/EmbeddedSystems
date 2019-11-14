@@ -8,11 +8,7 @@ import java.net.*;
 import java.util.concurrent.BlockingQueue;
 
 public class MailboxConnection extends Thread {
-    private InputStream in;
-    private OutputStream out;
     private Socket socket;
-    private String host;
-    private int port;
     private BlockingQueue<DMTPMessage> data;
     private BlockingQueue<DatagramPacket> dataMonitor;
     private Config configTransfer;
@@ -22,9 +18,7 @@ public class MailboxConnection extends Thread {
     ServerSocket serverSocket;
 
     // Constructor
-    public MailboxConnection(String host, int port, BlockingQueue<DMTPMessage> data, BlockingQueue dataMonitor, Config configTransfer, String ipTransfer, ServerSocket serverSocket) {
-        this.host = host;
-        this.port = port;
+    public MailboxConnection(Config configTransfer, String ipTransfer, ServerSocket serverSocket, BlockingQueue<DMTPMessage> data, BlockingQueue dataMonitor) {
         this.data = data;
         this.dataMonitor = dataMonitor;
         this.configTransfer = configTransfer;
