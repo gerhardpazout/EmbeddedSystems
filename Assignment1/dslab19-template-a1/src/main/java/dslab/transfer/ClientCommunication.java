@@ -18,7 +18,6 @@ public class ClientCommunication extends Thread {
     private InputStreamReader isr;
     private BufferedReader bfr;
     private PrintWriter pr;
-    private boolean isRunning;
 
     // Constructor
     public ClientCommunication(ServerSocket serverSocket, Socket socket, InputStream in, OutputStream out, BlockingQueue<DMTPMessage> data, InputStreamReader isr, BufferedReader bfr, PrintWriter pr)
@@ -37,7 +36,6 @@ public class ClientCommunication extends Thread {
     public void run()
     {
         try {
-            isRunning = true;
 
             //Receiver message from incoming device
             //InputStreamReader isr = new InputStreamReader(socket.getInputStream());
@@ -57,7 +55,7 @@ public class ClientCommunication extends Thread {
             String responseToClient;
             DMTPMessage dmtp = new DMTPMessage();
 
-            while (!serverSocket.isClosed() && isRunning && (messageFromClient = bfr.readLine()) != null) {
+            while (!serverSocket.isClosed() && (messageFromClient = bfr.readLine()) != null) {
 
                 if(!messageFromClient.isEmpty()){
 
@@ -116,9 +114,14 @@ public class ClientCommunication extends Thread {
     }
 
     public void closeConnection(){
-        // close input & output streams
-        isRunning = false;
+        // close socket connection
+        try {
+            socket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
+        // close input & output streams
         pr.flush();
         try {
             isr.close();
@@ -131,12 +134,7 @@ public class ClientCommunication extends Thread {
             e.printStackTrace();
         }
         pr.close();
-        // close socket connection
-        try {
-            socket.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+
         this.interrupt();
     }
 

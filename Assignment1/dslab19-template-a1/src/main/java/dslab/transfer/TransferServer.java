@@ -82,7 +82,7 @@ public class TransferServer implements ITransferServer, Runnable {
         //Executors pool = Executors.newFixedThreadPool(20);
 
         //while (true) {
-            pool.execute(new ClientConnectionHandler(config.getInt("tcp.port"), data, dataMonitor, serverSocket, isr, bfr, pr));
+            pool.execute(new ClientConnectionHandler(data, dataMonitor, serverSocket, isr, bfr, pr));
             pool.execute(new MailboxConnection("localhost", 11482, data, dataMonitor, config, ip, serverSocket));
             pool.execute(new MonitoringConnection(config.getString("monitoring.host"), config.getInt("monitoring.port"), dataMonitor, serverSocket));
             pool.execute(shell);

@@ -15,20 +15,17 @@ public class ClientConnectionHandler extends Thread {
     ServerSocket serverSocket;
     BlockingQueue<DMTPMessage> data;
     BlockingQueue dataMonitor;
-    int port;
-    boolean isRunning;
     private InputStreamReader isr;
     private BufferedReader bfr;
     private PrintWriter pr;
 
     Socket socketClient;
 
-    public ClientConnectionHandler(int port, BlockingQueue<DMTPMessage> data, BlockingQueue dataMonitor, ServerSocket serverSocket, InputStreamReader isr, BufferedReader bfr, PrintWriter pr){
+    public ClientConnectionHandler(BlockingQueue<DMTPMessage> data, BlockingQueue dataMonitor, ServerSocket serverSocket, InputStreamReader isr, BufferedReader bfr, PrintWriter pr){
 
         this.serverSocket = serverSocket;
         this.data = data;
         this.dataMonitor = dataMonitor;
-        this.port = port;
         this.isr = isr;
         this.bfr = bfr;
         this.pr = pr;
@@ -37,8 +34,6 @@ public class ClientConnectionHandler extends Thread {
 
     @Override
     public void run(){
-        isRunning = true;
-
         while(serverSocket != null && !serverSocket.isClosed()){
             try {
                 //accept incoming request / get the socket from incoming device
