@@ -42,7 +42,7 @@ public class MonitoringServer implements IMonitoringServer {
         this.out = out;
 
         shell = new Shell(this.in, this.out);
-        
+
         shell.register("addresses", ((input, context) -> addresses()));
         shell.register("servers", ((input, context) -> servers()));
         shell.register("shutdown", (input, context) -> {
