@@ -43,13 +43,12 @@ public class MonitoringConnection extends Thread {
 
                     //e.printStackTrace();
                 } catch (IOException e) {
-                    System.out.println("IOException: run()");
+                    System.out.println("No packet in data queue");
                     //e.printStackTrace();
-                } finally {
-                    closeConnection();
                 }
             }
         }
+        closeConnection();
     }
 
     public void closeConnection(){
