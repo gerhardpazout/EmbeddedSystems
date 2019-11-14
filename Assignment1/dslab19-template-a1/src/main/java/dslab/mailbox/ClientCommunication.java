@@ -127,8 +127,6 @@ public class ClientCommunication extends Thread {
 
         switch (command){
             case "login":
-                //
-                System.out.println("calling login / check user function...");
 
                 //if login successful
                 if(isNullOrEmpty(context)){
@@ -150,8 +148,6 @@ public class ClientCommunication extends Thread {
                     else{
                         isLoggedIn = checkUser(user, password);
                         this.user = user;
-                        System.out.println("login successful!");
-                        System.out.println("USER: " + this.user);
                     }
                 }
                 break;
@@ -178,7 +174,6 @@ public class ClientCommunication extends Thread {
                         id = Integer.parseInt(context);
                         ArrayList<DMTPDatabaseMessage> messagesByUser = db.getMessagesByRecipient(getEmailFromUser(this.user));
                         if (messagesByUser == null || messagesByUser.size() == 0){
-                            System.out.println("LIST EMPTY");
                             response = "no messages.";
                         }
                         else if(db.getMessageById(id) == null){
@@ -297,7 +292,7 @@ public class ClientCommunication extends Thread {
     }
 
     private String getEmailFromUser(String username){
-        System.out.println("EMAIL: " +  username + "@" + getDomainFromComponentId());
+        //System.out.println("EMAIL: " +  username + "@" + getDomainFromComponentId());
         return username + "@" + getDomainFromComponentId();
     }
 }
