@@ -23,6 +23,8 @@ public class MonitoringServer implements IMonitoringServer {
     private HashMap<String, Integer> servers = new HashMap<>();
     private DatagramSocket socket;
     private boolean running;
+    private InputStream in;
+    private PrintStream out;
 
     ExecutorService pool;
     /**
@@ -36,23 +38,17 @@ public class MonitoringServer implements IMonitoringServer {
     public MonitoringServer(String componentId, Config config, InputStream in, PrintStream out) {
         this.componentId = componentId;
         this.config = config;
+        this.in = in;
+        this.out = out;
 
-        shell = new Shell(in, out);
-
+        shell = new Shell(this.in, this.out);
+        
+        shell.register("addresses", ((input, context) -> addresses()));
+        shell.register("servers", ((input, context) -> servers()));
         shell.register("shutdown", (input, context) -> {
             shutdown();
             throw new StopShellException();
         });
-        shell.register("addresses", (input, context) -> {
-            addresses();
-            throw new StopShellException();
-        });
-        shell.register("servers", (input, context) -> {
-            servers();
-            throw new StopShellException();
-        });
-
-        //shell.register(this);
     }
 
     @Override
@@ -73,7 +69,7 @@ public class MonitoringServer implements IMonitoringServer {
             running = true;
             byte[] buf;
 
-            while (running) {
+            while (socket != null && !socket.isClosed()) {
                 buf = new byte[1024];
                 DatagramPacket packet = new DatagramPacket(buf, buf.length);
 
