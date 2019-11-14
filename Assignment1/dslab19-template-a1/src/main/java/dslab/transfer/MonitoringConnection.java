@@ -3,6 +3,7 @@ package dslab.transfer;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.ServerSocket;
 import java.net.SocketException;
 import java.util.concurrent.BlockingQueue;
 
@@ -11,12 +12,13 @@ public class MonitoringConnection extends Thread {
     private int port;
     private DatagramSocket socket;
     private BlockingQueue<DatagramPacket> data;
-    private boolean isRunning = false;
+    private ServerSocket serverSocket;
 
-    public MonitoringConnection(String host, int port, BlockingQueue<DatagramPacket> data){
+    public MonitoringConnection(String host, int port, BlockingQueue<DatagramPacket> data, ServerSocket serverSocket){
         this.host = host;
         this.port = port;
         this.data = data;
+        this.serverSocket = serverSocket;
     }
 
     @Override
@@ -28,10 +30,8 @@ public class MonitoringConnection extends Thread {
             e.printStackTrace();
         }
 
-        isRunning = true;
-
         //if there is data => send data to monitoring server
-        while (isRunning){
+        while (serverSocket != null && !serverSocket.isClosed()){
             while( !data.isEmpty() ){
                 try {
                     DatagramPacket packet = data.take();
@@ -46,12 +46,15 @@ public class MonitoringConnection extends Thread {
                     System.out.println("IOException: run()");
                     //e.printStackTrace();
                 } finally {
-                    isRunning = false;
-                    if(socket != null && !socket.isClosed()){
-                        socket.close();
-                    }
+                    closeConnection();
                 }
             }
+        }
+    }
+
+    public void closeConnection(){
+        if(socket != null && !socket.isClosed()){
+            socket.close();
         }
     }
 }

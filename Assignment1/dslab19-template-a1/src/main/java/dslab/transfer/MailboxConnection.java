@@ -19,25 +19,24 @@ public class MailboxConnection extends Thread {
     private String ipTransfer;
 
     private Config domains = new Config("domains.properties");
-
-    private boolean isRunning = false;
+    ServerSocket serverSocket;
 
     // Constructor
-    public MailboxConnection(String host, int port, BlockingQueue<DMTPMessage> data, BlockingQueue dataMonitor, Config configTransfer, String ipTransfer) {
+    public MailboxConnection(String host, int port, BlockingQueue<DMTPMessage> data, BlockingQueue dataMonitor, Config configTransfer, String ipTransfer, ServerSocket serverSocket) {
         this.host = host;
         this.port = port;
         this.data = data;
         this.dataMonitor = dataMonitor;
         this.configTransfer = configTransfer;
         this.ipTransfer = ipTransfer;
+        this.serverSocket = serverSocket;
 
     }
 
     @Override
     public void run()
     {
-        isRunning = true;
-        while (isRunning){
+        while (serverSocket != null && !serverSocket.isClosed()){
             DMTPMessage dmtp;
             while( !data.isEmpty() ){
 
@@ -49,16 +48,19 @@ public class MailboxConnection extends Thread {
                     }
 
                 } catch (InterruptedException e) {
-                    e.printStackTrace();
-                    isRunning = false;
+                    //e.printStackTrace();
+                    closeConnection();
                 }
             }
+        }
+    }
 
+    public void closeConnection(){
+        if (socket != null && !socket.isClosed()){
             try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
+                socket.close();
+            } catch (IOException e) {
                 e.printStackTrace();
-                isRunning = false;
             }
         }
     }
